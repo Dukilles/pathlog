@@ -239,6 +239,16 @@ end
 
 commands = {}
 
+commands.start = function()
+    settings.logPath = true
+    windower.add_to_chat(8, 'Path logging ON')
+end
+
+commands.stop = function()
+    settings.logPath = false
+    windower.add_to_chat(8, 'Path logging OFF')
+end
+
 commands.dsp = function()
     if settings.dsp == true then
         settings.dsp = false
@@ -248,16 +258,6 @@ commands.dsp = function()
         windower.add_to_chat(8, 'Darkstar = TRUE')
     end
     settings:save()
-end
-
-commands.start = function()
-    settings.logPath = true
-    windower.add_to_chat(8, 'Path logging ON')
-end
-
-commands.stop = function()
-    settings.logPath = false
-    windower.add_to_chat(8, 'Path logging OFF')
 end
 
 commands.mode = function(args)
@@ -380,18 +380,63 @@ commands.list = function(args)
     end
 end
 
+commands.st = function()
+    return commands.start()
+end
+
+commands.sp = function()
+    return commands.stop()
+end
+
+commands.d = function()
+    return commands.dsp()
+end
+
+commands.m = function(args)
+    return commands.mode(args)
+end
+
+commands.a = function()
+    return commands.all()
+end
+
+commands.ts = function()
+    return commands.timestamp()
+end
+
+commands.tp = function()
+    return commands.tablepoints()
+end
+
+commands.dc = function()
+    return commands.definecoordinates()
+end
+
+commands.p = function(args)
+    return commands.point(args)
+end
+
+commands.l = function(args)
+    return commands.list(args)
+end
+
+commands.h = function()
+    return commands.help()
+end
+
 commands.help = function()
     windower.add_to_chat(8, 'pathlog (or //pl)')
-    windower.add_to_chat(8, '//pathlog start - Begin logging targeted entity\'s path')
-    windower.add_to_chat(8, '//pathlog stop - Stop logging targeted entity\'s path')
-    windower.add_to_chat(8, '//pathlog mode target(t)|list(l) - change tracking mode from cursor target to a set list')
-    windower.add_to_chat(8, '//pathlog list add(a)|remove(r) ID - In list mode, add/remove targets from tracking list. If no ID, will attempt to use cursor target ID')
-    windower.add_to_chat(8, '//pathlog list show(s) - Show tracking list in chat log')
-    windower.add_to_chat(8, '//pathlog all - output all positions to log without any filtering (default FALSE)')
-    windower.add_to_chat(8, '//pathlog timestamp - toggle timestamp in log on and off (default TRUE)')
-    windower.add_to_chat(8, '//pathlog tablepoints - toggle table each path point on and off (default FALSE)')
-    windower.add_to_chat(8, '//pathlog definecoordinates - toggle define coordinates on and off ( x = #, y = #, z = # ) (default FALSE)')
-    windower.add_to_chat(8, '//pathlog point \'...\' - will add anything typed after point to a comment in the logs')
+    windower.add_to_chat(8, '//pathlog start(st) - Begin logging targeted entity\'s path')
+    windower.add_to_chat(8, '//pathlog stop(sp) - Stop logging targeted entity\'s path')
+    windower.add_to_chat(8, '//pathlog dsp(d) - toggle Darkstar coordinate order (default FALSE)')
+    windower.add_to_chat(8, '//pathlog mode(m) target(t)|list(l) - change tracking mode from cursor target to a set list')
+    windower.add_to_chat(8, '//pathlog list(l) add(a)|remove(r) ID - In list mode, add/remove targets from tracking list. If no ID, will attempt to use cursor target ID')
+    windower.add_to_chat(8, '//pathlog list(l) show(s) - Show tracking list in chat log')
+    windower.add_to_chat(8, '//pathlog all(a) - output all positions to log without any filtering (default FALSE)')
+    windower.add_to_chat(8, '//pathlog timestamp(ts) - toggle timestamp in log (default TRUE)')
+    windower.add_to_chat(8, '//pathlog tablepoints(tp) - toggle table each path point (default FALSE)')
+    windower.add_to_chat(8, '//pathlog definecoordinates(dc) - toggle define coordinates (x = #) (default FALSE)')
+    windower.add_to_chat(8, '//pathlog point(p) \'...\' - will add anything typed after point to a comment in the logs')
     windower.add_to_chat(8, '//pathlog help - displays help')
 end
 
