@@ -42,6 +42,14 @@ Pathlog will use the following folder structure for self targeted path logs:
 
 Pathlog will use the following settings (adjusted with commands above) to determine if a point should be logged:
 When a point is received, it is compared to the previous point. The cumulative difference is the total difference between the current point and the previous point. If the cumulative difference is greater than the cumulative difference setting, the point is logged. If the cumulative difference is less than the cumulative difference setting, the x, y, and z differences are compared to their respective settings. If any of the differences are greater than their respective settings, the point is logged. If none of the differences are greater than their respective settings, the point is not logged. If the `all` setting is true, the point is logged regardless of the above calculations.
+
+#### Default Settings
+- Default Mode: Target
+- Default Timestamp: True
+- Default Timestamp Format: %H:%M:%S (must be changed in settings.xml if desired)
+- Default Table Points: False
+- Default Define Coordinates: False
+- Default All: False
 - Default Cumulative Difference: 4
 - Default X Difference: 3
 - Default Y Difference: 0.5
