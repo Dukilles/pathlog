@@ -45,6 +45,7 @@ When a point is received, it is compared to the previous point. The cumulative d
 
 #### Default Settings
 - Default Mode: Target
+- Default Message Color: 219 (must be changed in settings.xml if desired)
 - Default Timestamp: True
 - Default Timestamp Format: %H:%M:%S (must be changed in settings.xml if desired)
 - Default Table Points: False
