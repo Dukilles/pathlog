@@ -310,14 +310,22 @@ commands.list = function(args)
     end
 
     if option == 'add' or option == 'a' then
-        pathlog.trackList:append(id)
-        windower.add_to_chat(settings.messageColor, 'Added '..id.. ' to tracking list. ')
+        if id then
+            pathlog.trackList:append(id)
+            windower.add_to_chat(settings.messageColor, 'Added '..id.. ' to tracking list. ')
+        else
+            windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to add to tracking list.')
+        end
     elseif option == 'remove' or option == 'r' then
-        pathlog.trackList:remove(id)
-        windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
+        if id then
+            pathlog.trackList:remove(id)
+            windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
+        else
+            windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to remove from tracking list.')
+        end
     elseif option == 'clear' or option == 'c' then
         pathlog.trackList:clear()
-        windower.add_to_chat(settings.messageColor, 'Cleared tracking list: ')
+        windower.add_to_chat(settings.messageColor, 'Cleared tracking list! ')
     end
 end
 
