@@ -8,7 +8,7 @@ the player's cursor target or player can create a list. Be sure to read and unde
 path logging. Player *must* be in the same zone and close enough to receive an incoming packet (close enough
 to see a red dot on FFXIDB minimap in my experience).
 
-## Install and Load
+### Install and Load
 
 Download, extract to addons folder, and `//lua load pathlog` in game ( or `//lua l pathlog`).
 
@@ -36,17 +36,17 @@ Once loaded, the following commands are available via `//pathlog` or `//pl` for 
 
 Pathlog will use the following settings (adjusted with commands above) to determine if a point should be logged:
 When a point is received, it is compared to the previous point. The cumulative difference is the total difference between the current point and the previous point. If the cumulative difference is greater than the cumulative difference setting, the point is logged. If the cumulative difference is less than the cumulative difference setting, the x, y, and z differences are compared to their respective settings. If any of the differences are greater than their respective settings, the point is logged. If none of the differences are greater than their respective settings, the point is not logged. If the `all` setting is true, the point is logged regardless of the above calculations.
-Default Cumulative Difference: 4
-Default X Difference: 3
-Default Y Difference: 0.5
-Default Z Difference: 3
+- Default Cumulative Difference: 4
+- Default X Difference: 3
+- Default Y Difference: 0.5
+- Default Z Difference: 3
 
-#### Examples
-`//pl timestamp`    : 123.456, 7.890, 123.456,   -- 01:23:42
-`tablepoints`       : {123.456, 7.890, 123.456},
-`definecoordinates` : x = 123.456, y = 7.890, z = 123.456,
-`point comment`     : 123.456, 7.890, 123.456, -- comment
+### Examples
+- `//pl timestamp`    : 123.456, 7.890, 123.456,   -- 01:23:42
+- `tablepoints`       : {123.456, 7.890, 123.456},
+- `definecoordinates` : x = 123.456, y = 7.890, z = 123.456,
+- `point comment`     : 123.456, 7.890, 123.456, -- comment
 
 ##### Change Log
 - v1.0 22 Aug, 2023
-    - Initial release
+    -- Initial release
