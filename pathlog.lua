@@ -12,9 +12,8 @@ require('lists')
 
 defaults = {}
 defaults.logPath = false
-defaults.dsp = false
 defaults.mode = 'target'
-defaults.TimestampFormat = '-- [ %H:%M:%S ]'
+defaults.TimestampFormat = '-- %H:%M:%S'
 defaults.AddTimestamp = true
 defaults.tableEachPoint = false
 defaults.defineCoordinates = false
@@ -42,25 +41,17 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
     npc.look = packet['look']
     npc.polutils = packet['polutils_name']
 
-    if npc.id then
+    if pathlog.willScan(npc.look, npc.polutils) and npc.id then
         -- walkCount = packet['Walk Count'] -- on the shelf until v2
 
-        if settings.dsp then
-            pos.x = packet['X']
-            pos.y = packet['Y'] -- Windower and DSP have Z and Y axis swapped vs each other
-            pos.z = packet['Z']
-        else
-            pos.x = packet['X']
-            pos.y = packet['Z']
-            pos.z = packet['Y']
-        end
+        pos.x = packet['X']
+        pos.y = packet['Z'] -- Windower has Z and Y axis swapped
+        pos.z = packet['Y']
 
-        if settings.logPath then
-            if settings.mode == 'target' then
-                pathlog.logNpcByTarget(npc.id, pos.x, pos.y, pos.z)
-            elseif settings.mode == 'list' then
-                pathlog.logNpcByList(npc.id, pos.x, pos.y, pos.z)
-            end
+        if settings.mode == 'target' then
+            pathlog.logNpcByTarget(npc.id, pos.x, pos.y, pos.z)
+        elseif settings.mode == 'list' then
+            pathlog.logNpcByList(npc.id, pos.x, pos.y, pos.z)
         end
     end
 end)
@@ -69,10 +60,7 @@ windower.register_event('outgoing chunk', function(id, data, modified, injected,
     if not windower.ffxi.get_info().logged_in then return end
     if not settings.logPath then return end
 
-    local packet = packets.parse('outgoing', data)
-    -- local runCount = packet['Run Count'] -- on the shelf until v2
-
-    if settings.logPath and settings.mode == 'target' then
+    if settings.mode == 'target' then
         pathlog.logSelfByTarget()
     end
 end)
@@ -103,8 +91,8 @@ function pathlog.logNpcByTarget(npcID, x, y, z)
             logFile:create()
         end
 
-        if pathlog.shouldLogPoint(logFile, target.x, target.y, target.z) then
-            logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, target.x, defineY, target.y, defineZ, target.z, closeBracket, timestamp))
+        if pathlog.shouldLogPoint(logFile, x, y, z) then
+            logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
         end
     end
 end
@@ -137,8 +125,8 @@ function pathlog.logNpcByList(npcID, x, y, z)
                 logFile:create()
             end
 
-            if pathlog.shouldLogPoint(logFile, target.x, target.y, target.z) then
-                logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, target.x, defineY, target.y, defineZ, target.z, closeBracket, timestamp))
+            if pathlog.shouldLogPoint(logFile, x, y, z) then
+                logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
             end
         end
     end
@@ -159,13 +147,16 @@ function pathlog.logSelfByTarget()
         local defineX = settings.defineCoordinates and 'x = ' or ''
         local defineY = settings.defineCoordinates and 'y = ' or ''
         local defineZ = settings.defineCoordinates and 'z = ' or ''
+        local x = target.x
+        local y = target.z -- Windower has Z and Y axis swapped
+        local z = target.y
 
         if not logFile:exists() then
             logFile:create()
         end
 
-        if pathlog.shouldLogPoint(logFile, target.x, target.y, target.z) then
-            logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, target.x, defineY, target.y, defineZ, target.z, closeBracket, timestamp))
+        if pathlog.shouldLogPoint(logFile, x, y, z) then
+            logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
         end
     end
 end
@@ -185,6 +176,9 @@ function pathlog.logPointWithComment(comment)
         local defineX = settings.defineCoordinates and 'x = ' or ''
         local defineY = settings.defineCoordinates and ' y = ' or ' '
         local defineZ = settings.defineCoordinates and ' z = ' or ' '
+        local x = target.x
+        local y = target.z -- Windower has Z and Y axis swapped
+        local z = target.y
 
         if not comment then
             comment = ''
@@ -196,35 +190,29 @@ function pathlog.logPointWithComment(comment)
             logFile:create()
         end
 
-        logFile:append(string.format("%s%s%.3f,%s%.3f,%s%.3f%s,   %s    -- %s\n", openBracket, defineX, target.x, defineY, target.y, defineZ, target.z, closeBracket, timestamp, comment))
+        logFile:append(string.format("%s%s%.3f,%s%.3f,%s%.3f%s,   %s    -- %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp, comment))
     end
 end
 
-function pathlog.shouldLogPoint(logFile, targetX, targetY, targetZ)
+function pathlog.shouldLogPoint(logFile, x, y, z)
     local readLines = files.readlines(logFile)
     local lastLine = readLines[#readLines - 1]
     local chars = 'xyz= '
 
-    if (not readLines or not lastLine or settings.all) and settings.logPath then
+    if not readLines or not lastLine or settings.all then
         return true
     end
 
     local lastX = lastLine:split(',')[1]:stripchars(chars)
     local lastY = lastLine:split(',')[2]:stripchars(chars)
     local lastZ = lastLine:split(',')[3]:stripchars(chars)
-    local xDiff = math.abs(lastX - targetX)
-    local yDiff = math.abs(lastY - targetY)
-    local zDiff = math.abs(lastZ - targetZ)
+    local xDiff = math.abs(lastX - x)
+    local yDiff = math.abs(lastY - y)
+    local zDiff = math.abs(lastZ - z)
     local cumulativeDiff = xDiff + yDiff + zDiff
 
-    if settings.logPath then
-        if cumulativeDiff >= settings.cumulativeDiff then
-            return true
-        elseif math.abs(lastX - targetX) >= settings.xDiff or math.abs(lastZ - targetZ) >= settings.zDiff then
-            return true
-        elseif math.abs(lastY - targetY) >= settings.yDiff then
-            return true
-        end
+    if cumulativeDiff >= settings.cumulativeDiff or xDiff >= settings.xDiff or yDiff >= settings.yDiff or zDiff >= settings.zDiff then
+        return true
     end
 
     return false
@@ -237,11 +225,15 @@ function pathlog.willScan(look, polutils)
     return true
 end
 
-commands = {}
+local commands = {}
 
 commands.start = function()
     settings.logPath = true
     windower.add_to_chat(8, 'Path logging ON')
+end
+
+commands.st = function()
+    return commands.start()
 end
 
 commands.stop = function()
@@ -249,15 +241,8 @@ commands.stop = function()
     windower.add_to_chat(8, 'Path logging OFF')
 end
 
-commands.dsp = function()
-    if settings.dsp == true then
-        settings.dsp = false
-        windower.add_to_chat(8, 'Darkstar = FALSE')
-    elseif settings.dsp == false then
-        settings.dsp = true
-        windower.add_to_chat(8, 'Darkstar = TRUE')
-    end
-    settings:save()
+commands.sp = function()
+    return commands.stop()
 end
 
 commands.mode = function(args)
@@ -279,53 +264,8 @@ commands.mode = function(args)
     settings:save()
 end
 
-commands.all = function()
-    if settings.all == true then
-        settings.all = false
-        windower.add_to_chat(8, 'Log all = FALSE')
-    elseif settings.all == false then
-        settings.all = true
-        windower.add_to_chat(8, 'Log all = TRUE')
-    end
-    settings:save()
-end
-
-commands.timestamp = function()
-    if settings.AddTimestamp == true then
-        settings.AddTimestamp = false
-        windower.add_to_chat(8, 'Add timestamp to logs = FALSE')
-    elseif settings.AddTimestamp == false then
-        settings.AddTimestamp = true
-        windower.add_to_chat(8, 'Add timestamp to logs = TRUE')
-    end
-    settings:save()
-end
-
-commands.tablepoints = function()
-    if settings.tableEachPoint == true then
-        settings.tableEachPoint = false
-        windower.add_to_chat(8, 'Table each point = FALSE')
-    elseif settings.tableEachPoint == false then
-        settings.tableEachPoint = true
-        windower.add_to_chat(8, 'Table each point = TRUE')
-    end
-    settings:save()
-end
-
-commands.definecoordinates = function()
-    if settings.defineCoordinates == true then
-        settings.defineCoordinates = false
-        windower.add_to_chat(8, 'Define coordinates = FALSE')
-    elseif settings.defineCoordinates == false then
-        settings.defineCoordinates = true
-        windower.add_to_chat(8, 'Define coordinates = TRUE')
-    end
-    settings:save()
-end
-
-commands.point = function(args)
-    pathlog.logPointWithComment(args)
-    windower.add_to_chat(8, 'Point added to logs')
+commands.m = function(args)
+    return commands.mode(args)
 end
 
 commands.list = function(args)
@@ -380,64 +320,123 @@ commands.list = function(args)
     end
 end
 
-commands.st = function()
-    return commands.start()
+commands.l = function(args)
+    return commands.list(args)
 end
 
-commands.sp = function()
-    return commands.stop()
-end
+commands.all = function()
+    if settings.all == true then
+        settings.all = false
+        windower.add_to_chat(8, 'Log all = FALSE')
+    elseif settings.all == false then
+        settings.all = true
+        windower.add_to_chat(8, 'Log all = TRUE')
+    end
 
-commands.d = function()
-    return commands.dsp()
-end
-
-commands.m = function(args)
-    return commands.mode(args)
+    settings:save()
 end
 
 commands.a = function()
     return commands.all()
 end
 
+commands.diff = function(args)
+    local option = args:remove(1)
+    local value = tonumber(args:concat(' '))
+
+    if option == 'cumulative' or option == 'c' then
+        settings.cumulativeDiff = value
+        windower.add_to_chat(8, 'Cumulative Diff = '..settings.cumulativeDiff)
+    elseif option == 'x' then
+        settings.xDiff = value
+        windower.add_to_chat(8, 'x Diff = '..settings.xDiff)
+    elseif option == 'y' then
+        settings.yDiff = value
+        windower.add_to_chat(8, 'y Diff = '..settings.yDiff)
+    elseif option == 'z' then
+        settings.zDiff = value
+        windower.add_to_chat(8, 'z Diff = '..settings.zDiff)
+    else
+        windower.add_to_chat(8, 'Valid arguments are cumulative(c), x, y, or z followed by a number')
+        return
+    end
+
+    settings:save()
+end
+
+commands.d = function(args)
+    return commands.diff(args)
+end
+
+commands.timestamp = function()
+    if settings.AddTimestamp == true then
+        settings.AddTimestamp = false
+        windower.add_to_chat(8, 'Add timestamp to logs = FALSE')
+    elseif settings.AddTimestamp == false then
+        settings.AddTimestamp = true
+        windower.add_to_chat(8, 'Add timestamp to logs = TRUE')
+    end
+
+    settings:save()
+end
+
 commands.ts = function()
     return commands.timestamp()
+end
+
+commands.tablepoints = function()
+    if settings.tableEachPoint == true then
+        settings.tableEachPoint = false
+        windower.add_to_chat(8, 'Table each point = FALSE')
+    elseif settings.tableEachPoint == false then
+        settings.tableEachPoint = true
+        windower.add_to_chat(8, 'Table each point = TRUE')
+    end
+
+    settings:save()
 end
 
 commands.tp = function()
     return commands.tablepoints()
 end
 
+commands.definecoordinates = function()
+    if settings.defineCoordinates == true then
+        settings.defineCoordinates = false
+        windower.add_to_chat(8, 'Define coordinates = FALSE')
+    elseif settings.defineCoordinates == false then
+        settings.defineCoordinates = true
+        windower.add_to_chat(8, 'Define coordinates = TRUE')
+    end
+
+    settings:save()
+end
+
 commands.dc = function()
     return commands.definecoordinates()
+end
+
+commands.point = function(args)
+    pathlog.logPointWithComment(args)
+    windower.add_to_chat(8, 'Point added to logs')
 end
 
 commands.p = function(args)
     return commands.point(args)
 end
 
-commands.l = function(args)
-    return commands.list(args)
-end
-
-commands.h = function()
-    return commands.help()
-end
-
 commands.help = function()
     windower.add_to_chat(8, 'pathlog (or //pl)')
     windower.add_to_chat(8, '//pathlog start(st) - Begin logging targeted entity\'s path')
     windower.add_to_chat(8, '//pathlog stop(sp) - Stop logging targeted entity\'s path')
-    windower.add_to_chat(8, '//pathlog dsp(d) - toggle Darkstar coordinate order (default FALSE)')
-    windower.add_to_chat(8, '//pathlog mode(m) target(t)|list(l) - change tracking mode from cursor target to a set list')
-    windower.add_to_chat(8, '//pathlog list(l) add(a)|remove(r) ID - In list mode, add/remove targets from tracking list. If no ID, will attempt to use cursor target ID')
-    windower.add_to_chat(8, '//pathlog list(l) show(s) - Show tracking list in chat log')
-    windower.add_to_chat(8, '//pathlog all(a) - output all positions to log without any filtering (default FALSE)')
+    windower.add_to_chat(8, '//pathlog mode(m) target(t)|list(l) - change tracking mode from cursor target to a set list (default target))')
+    windower.add_to_chat(8, '//pathlog list(l) add(a)|remove(r)|show(s) ID - In list mode, add/remove ID|target to/from tracking list.')
+    windower.add_to_chat(8, '//pathlog all(a) - log all positions without difference filtering (default FALSE)')
+    windower.add_to_chat(8, '//pathlog diff(d) cumulative(c)|x|y|z (value)- set diff required between points to log (default cumulative 4, x = 3, y = 0.5, z = 3)')
     windower.add_to_chat(8, '//pathlog timestamp(ts) - toggle timestamp in log (default TRUE)')
     windower.add_to_chat(8, '//pathlog tablepoints(tp) - toggle table each path point (default FALSE)')
     windower.add_to_chat(8, '//pathlog definecoordinates(dc) - toggle define coordinates (x = #) (default FALSE)')
-    windower.add_to_chat(8, '//pathlog point(p) \'...\' - will add anything typed after point to a comment in the logs')
-    windower.add_to_chat(8, '//pathlog help - displays help')
+    windower.add_to_chat(8, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
 end
 
 windower.register_event('addon command', function(command, ...)
