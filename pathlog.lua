@@ -11,6 +11,7 @@ require('strings')
 require('lists')
 
 defaults = {}
+defaults.messageColor = 219
 defaults.logPath = false
 defaults.mode = 'target'
 defaults.TimestampFormat = '-- %H:%M:%S'
@@ -229,7 +230,7 @@ local commands = {}
 
 commands.start = function()
     settings.logPath = true
-    windower.add_to_chat(8, 'Path logging ON')
+    windower.add_to_chat(settings.messageColor, 'Path logging ON')
 end
 
 commands.st = function()
@@ -238,7 +239,7 @@ end
 
 commands.stop = function()
     settings.logPath = false
-    windower.add_to_chat(8, 'Path logging OFF')
+    windower.add_to_chat(settings.messageColor, 'Path logging OFF')
 end
 
 commands.sp = function()
@@ -256,7 +257,7 @@ commands.mode = function(args)
 
     if newMode == 'target' or newMode == 'list' then
         settings.mode = newMode
-        windower.add_to_chat(8, 'Pathlog mode: '..settings.mode)
+        windower.add_to_chat(settings.messageColor, 'Pathlog mode: '..settings.mode)
     else
         commands.help()
     end
@@ -278,13 +279,13 @@ commands.list = function(args)
         local trackList = pathlog.trackList
 
         if #trackList > 0 then
-            windower.add_to_chat(8, 'Pathlog Tracklist:')
+            windower.add_to_chat(settings.messageColor, 'Pathlog Tracklist:')
 
             for entry = 1, #trackList do
-                windower.add_to_chat(8, ''..trackList[entry])
+                windower.add_to_chat(settings.messageColor, ''..trackList[entry])
             end
         else
-            windower.add_to_chat(8, 'Pathlog Tracklist is Empty')
+            windower.add_to_chat(settings.messageColor, 'Pathlog Tracklist is Empty')
         end
 
         return
@@ -298,7 +299,7 @@ commands.list = function(args)
     elseif not id then -- Look for cursor target next
         if target then
             if target.name == player.name or target.index == player.index then
-                windower.add_to_chat(8, 'Cannot target player in list mode. Switch to target mode to log player path')
+                windower.add_to_chat(settings.messageColor, 'Cannot target player in list mode. Switch to target mode to log player path')
             else
                 id = target.id
             end
@@ -310,13 +311,13 @@ commands.list = function(args)
 
     if option == 'add' or option == 'a' then
         pathlog.trackList:append(id)
-        windower.add_to_chat(8, 'Added '..id.. ' to tracking list. ')
+        windower.add_to_chat(settings.messageColor, 'Added '..id.. ' to tracking list. ')
     elseif option == 'remove' or option == 'r' then
         pathlog.trackList:remove(id)
-        windower.add_to_chat(8, 'Removed '..id.. ' from tracking list. ')
+        windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
     elseif option == 'clear' or option == 'c' then
         pathlog.trackList:clear()
-        windower.add_to_chat(8, 'Cleared tracking list: ')
+        windower.add_to_chat(settings.messageColor, 'Cleared tracking list: ')
     end
 end
 
@@ -327,10 +328,10 @@ end
 commands.all = function()
     if settings.all == true then
         settings.all = false
-        windower.add_to_chat(8, 'Log all = FALSE')
+        windower.add_to_chat(settings.messageColor, 'Log all = FALSE')
     elseif settings.all == false then
         settings.all = true
-        windower.add_to_chat(8, 'Log all = TRUE')
+        windower.add_to_chat(settings.messageColor, 'Log all = TRUE')
     end
 
     settings:save()
@@ -346,18 +347,18 @@ commands.diff = function(args)
 
     if option == 'cumulative' or option == 'c' then
         settings.cumulativeDiff = value
-        windower.add_to_chat(8, 'Cumulative Diff = '..settings.cumulativeDiff)
+        windower.add_to_chat(settings.messageColor, 'Cumulative Diff = '..settings.cumulativeDiff)
     elseif option == 'x' then
         settings.xDiff = value
-        windower.add_to_chat(8, 'x Diff = '..settings.xDiff)
+        windower.add_to_chat(settings.messageColor, 'x Diff = '..settings.xDiff)
     elseif option == 'y' then
         settings.yDiff = value
-        windower.add_to_chat(8, 'y Diff = '..settings.yDiff)
+        windower.add_to_chat(settings.messageColor, 'y Diff = '..settings.yDiff)
     elseif option == 'z' then
         settings.zDiff = value
-        windower.add_to_chat(8, 'z Diff = '..settings.zDiff)
+        windower.add_to_chat(settings.messageColor, 'z Diff = '..settings.zDiff)
     else
-        windower.add_to_chat(8, 'Valid arguments are cumulative(c), x, y, or z followed by a number')
+        windower.add_to_chat(settings.messageColor, 'Valid arguments are cumulative(c), x, y, or z followed by a number')
         return
     end
 
@@ -371,10 +372,10 @@ end
 commands.timestamp = function()
     if settings.AddTimestamp == true then
         settings.AddTimestamp = false
-        windower.add_to_chat(8, 'Add timestamp to logs = FALSE')
+        windower.add_to_chat(settings.messageColor, 'Add timestamp to logs = FALSE')
     elseif settings.AddTimestamp == false then
         settings.AddTimestamp = true
-        windower.add_to_chat(8, 'Add timestamp to logs = TRUE')
+        windower.add_to_chat(settings.messageColor, 'Add timestamp to logs = TRUE')
     end
 
     settings:save()
@@ -387,10 +388,10 @@ end
 commands.tablepoints = function()
     if settings.tableEachPoint == true then
         settings.tableEachPoint = false
-        windower.add_to_chat(8, 'Table each point = FALSE')
+        windower.add_to_chat(settings.messageColor, 'Table each point = FALSE')
     elseif settings.tableEachPoint == false then
         settings.tableEachPoint = true
-        windower.add_to_chat(8, 'Table each point = TRUE')
+        windower.add_to_chat(settings.messageColor, 'Table each point = TRUE')
     end
 
     settings:save()
@@ -403,10 +404,10 @@ end
 commands.definecoordinates = function()
     if settings.defineCoordinates == true then
         settings.defineCoordinates = false
-        windower.add_to_chat(8, 'Define coordinates = FALSE')
+        windower.add_to_chat(settings.messageColor, 'Define coordinates = FALSE')
     elseif settings.defineCoordinates == false then
         settings.defineCoordinates = true
-        windower.add_to_chat(8, 'Define coordinates = TRUE')
+        windower.add_to_chat(settings.messageColor, 'Define coordinates = TRUE')
     end
 
     settings:save()
@@ -418,7 +419,7 @@ end
 
 commands.point = function(args)
     pathlog.logPointWithComment(args)
-    windower.add_to_chat(8, 'Point added to logs')
+    windower.add_to_chat(settings.messageColor, 'Point added to logs')
 end
 
 commands.p = function(args)
@@ -426,17 +427,17 @@ commands.p = function(args)
 end
 
 commands.help = function()
-    windower.add_to_chat(8, 'pathlog (or //pl)')
-    windower.add_to_chat(8, '//pathlog start(st) - Begin logging targeted entity\'s path')
-    windower.add_to_chat(8, '//pathlog stop(sp) - Stop logging targeted entity\'s path')
-    windower.add_to_chat(8, '//pathlog mode(m) target(t)|list(l) - change tracking mode from cursor target to a set list (default target))')
-    windower.add_to_chat(8, '//pathlog list(l) add(a)|remove(r)|show(s) ID - In list mode, add/remove ID|target to/from tracking list.')
-    windower.add_to_chat(8, '//pathlog all(a) - log all positions without difference filtering (default FALSE)')
-    windower.add_to_chat(8, '//pathlog diff(d) cumulative(c)|x|y|z (value)- set diff required between points to log (default cumulative 4, x = 3, y = 0.5, z = 3)')
-    windower.add_to_chat(8, '//pathlog timestamp(ts) - toggle timestamp in log (default TRUE)')
-    windower.add_to_chat(8, '//pathlog tablepoints(tp) - toggle table each path point (default FALSE)')
-    windower.add_to_chat(8, '//pathlog definecoordinates(dc) - toggle define coordinates (x = #) (default FALSE)')
-    windower.add_to_chat(8, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
+    windower.add_to_chat(settings.messageColor, 'pathlog (or //pl)')
+    windower.add_to_chat(settings.messageColor, '//pathlog start(st) - Begin logging targeted entity\'s path')
+    windower.add_to_chat(settings.messageColor, '//pathlog stop(sp) - Stop logging targeted entity\'s path')
+    windower.add_to_chat(settings.messageColor, '//pathlog mode(m) target(t)|list(l) - change tracking mode from cursor target to a set list (default target))')
+    windower.add_to_chat(settings.messageColor, '//pathlog list(l) add(a)|remove(r)|show(s) ID - In list mode, add/remove ID|target to/from tracking list.')
+    windower.add_to_chat(settings.messageColor, '//pathlog all(a) - log all positions without difference filtering (default FALSE)')
+    windower.add_to_chat(settings.messageColor, '//pathlog diff(d) cumulative(c)|x|y|z (value)- set diff required between points to log (default cumulative 4, x = 3, y = 0.5, z = 3)')
+    windower.add_to_chat(settings.messageColor, '//pathlog timestamp(ts) - toggle timestamp in log (default TRUE)')
+    windower.add_to_chat(settings.messageColor, '//pathlog tablepoints(tp) - toggle table each path point (default FALSE)')
+    windower.add_to_chat(settings.messageColor, '//pathlog definecoordinates(dc) - toggle define coordinates (x = #) (default FALSE)')
+    windower.add_to_chat(settings.messageColor, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
 end
 
 windower.register_event('addon command', function(command, ...)
