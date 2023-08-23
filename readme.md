@@ -75,3 +75,4 @@ When a point is received, it is compared to the previous point. The cumulative d
 
 - v1.1 23 Aug, 2023
   - Added padding and fixed a bug with brackets causing errors in diff calculation.
+  - Should log point equals false on 0.000, 0.000, 0.000 now.
