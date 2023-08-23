@@ -61,13 +61,13 @@ When a point is received, it is compared to the previous point. The cumulative d
 
 ### Examples
 - When `timestamp` is true:
-  --`123.456, 7.890, 123.456,   -- 01:23:42`
+  - `123.456, 7.890, 123.456,   -- 01:23:42`
 - When `tablepoints` is true:
-  --`{123.456, 7.890, 123.456},`
+  - `{123.456, 7.890, 123.456},`
 - When `definecoordinates` is true:
-  --`x = 123.456, y = 7.890, z = 123.456,`
+  - `x = 123.456, y = 7.890, z = 123.456,`
 - Using the command `point this is an important comment`:
-  --`123.456, 7.890, 123.456, -- this is an important comment`
+  - `123.456, 7.890, 123.456, -- this is an important comment`
 
 ##### Change Log
 - v1.0 23 Aug, 2023
