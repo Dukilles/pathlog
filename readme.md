@@ -70,5 +70,8 @@ When a point is received, it is compared to the previous point. The cumulative d
   - `123.456, 7.890, 123.456, -- this is an important comment`
 
 ##### Change Log
-- v1.0 23 Aug, 2023
+- v1.0 22 Aug, 2023
   - Initial release
+
+- v1.1 23 Aug, 2023
+  - Added padding and fixed a bug with brackets causing errors in diff calculation.
