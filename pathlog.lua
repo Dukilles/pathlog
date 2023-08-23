@@ -135,8 +135,8 @@ function pathlog.logNpcByList(npcID, x, y, z)
     if #trackList <= 0 then return end
 
     for entry = 1, #trackList do
-        local npcID = trackList[entry]
-        local target = windower.ffxi.get_mob_by_id(npcID)
+        local listID = trackList[entry]
+        local target = windower.ffxi.get_mob_by_id(listID)
 
         if target and npcID == target.id then
             local playerName = player.name
