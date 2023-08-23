@@ -70,6 +70,27 @@ windower.register_event('zone change', function(new, old)
     pathlog.trackList:clear()
 end)
 
+pathlog.caluclateCoordLen = function(isY)
+    local len = 8
+
+    if isY then
+        len = len - 1
+    end
+
+    return len
+end
+
+pathlog.padLeft = function(str, length, char)
+    local padded = string.rep(char or ' ', length - #str) .. str
+    return padded
+end
+
+pathlog.padCoords = function(coord, isY)
+    local padding = pathlog.caluclateCoordLen(isY)
+
+    return pathlog.padLeft(coord, padding)
+end
+
 function pathlog.logNpcByTarget(npcID, x, y, z)
     local player = windower.ffxi.get_player()
     local target = windower.ffxi.get_mob_by_target('t')
@@ -80,7 +101,7 @@ function pathlog.logNpcByTarget(npcID, x, y, z)
         local targetName = target.name
         local id = target.id
         local index = target.index
-        local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'/'..'['..index..']'..id..'.log')
+        local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
         local openBracket = settings.tableEachPoint and '{ ' or ''
         local closeBracket = settings.tableEachPoint and ' }' or ''
@@ -93,7 +114,15 @@ function pathlog.logNpcByTarget(npcID, x, y, z)
         end
 
         if pathlog.shouldLogPoint(logFile, x, y, z) then
-            logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
+            local x = string.format('%.3f', x)
+            local y = string.format('%.3f', y)
+            local z = string.format('%.3f', z)
+
+            x = pathlog.padCoords(x)
+            y = pathlog.padCoords(y, true)
+            z = pathlog.padCoords(z)
+
+            logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
         end
     end
 end
@@ -114,7 +143,7 @@ function pathlog.logNpcByList(npcID, x, y, z)
             local targetName = target.name
             local id = target.id
             local index = target.index
-            local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'/'..'['..index..']'..id..'.log')
+            local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
             local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
             local openBracket = settings.tableEachPoint and '{ ' or ''
             local closeBracket = settings.tableEachPoint and ' }' or ''
@@ -127,7 +156,15 @@ function pathlog.logNpcByList(npcID, x, y, z)
             end
 
             if pathlog.shouldLogPoint(logFile, x, y, z) then
-                logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
+                local x = string.format('%.3f', x)
+                local y = string.format('%.3f', y)
+                local z = string.format('%.3f', z)
+
+                x = pathlog.padCoords(x)
+                y = pathlog.padCoords(y, true)
+                z = pathlog.padCoords(z)
+
+                logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
             end
         end
     end
@@ -157,7 +194,15 @@ function pathlog.logSelfByTarget()
         end
 
         if pathlog.shouldLogPoint(logFile, x, y, z) then
-            logFile:append(string.format("%s%s%.3f, %s%.3f, %s%.3f%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
+            local x = string.format('%.3f', x)
+            local y = string.format('%.3f', y)
+            local z = string.format('%.3f', z)
+
+            x = pathlog.padCoords(x)
+            y = pathlog.padCoords(y, true)
+            z = pathlog.padCoords(z)
+
+            logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
         end
     end
 end
@@ -198,7 +243,7 @@ end
 function pathlog.shouldLogPoint(logFile, x, y, z)
     local readLines = files.readlines(logFile)
     local lastLine = readLines[#readLines - 1]
-    local chars = 'xyz= '
+    local chars = '}{xyz= '
 
     if not readLines or not lastLine or settings.all then
         return true
