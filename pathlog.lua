@@ -249,9 +249,9 @@ function pathlog.shouldLogPoint(logFile, x, y, z)
         return true
     end
 
-    if x == 0 and y == 0 and z == 0 then
+    --[[if x == 0 and y == 0 and z == 0 then
         return false
-    end
+    end]]
 
     local lastX = lastLine:split(',')[1]:stripchars(chars)
     local lastY = lastLine:split(',')[2]:stripchars(chars)
