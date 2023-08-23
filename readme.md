@@ -23,15 +23,15 @@ Once loaded, the following commands are available via `//pathlog` or `//pl` for 
 - `stop(sp)`              - Stops logging the path or paths of the target entity or entities.
 - `mode(m)`               - Changes the pathlogging "mode". Accepted arugments are `target(t)` or `list(l)`.
 - `list(l)`               - Will look for an ID number argument first. If not provided, uses the ID of the targeted entity.
--- `add(add)`             - Adds the current target to the list of targets to log. (Only works in list mode)
--- `remove(r)`            - Removes the current target from the list of targets to log.
--- `show(s)`              - Shows the current list of targets to log.
+  -- `add(add)`             - Adds the current target to the list of targets to log. (Only works in list mode)
+  -- `remove(r)`            - Removes the current target from the list of targets to log.
+  -- `show(s)`              - Shows the current list of targets to log.
 - `all(a)`                - Toggle true/false. When true log every point with no filtering (Approximately 5 positions every 2 seconds).
 - `diff(d)`               - These settings are used to determine whether or not to log an incoming point.
--- `cumulative(c)`        - Change the value of the cumulative difference setting.
--- `x`                    - Change the value of the x difference setting.
--- `y`                    - Change the value of the y difference setting.
--- `z`                    - Change the value of the z difference setting.
+  -- `cumulative(c)`        - Change the value of the cumulative difference setting.
+  -- `x`                    - Change the value of the x difference setting.
+  -- `y`                    - Change the value of the y difference setting.
+  -- `z`                    - Change the value of the z difference setting.
 - `timestamp(ts)`         - Toggle true/false. When true, adds a timestamp to each line of the log.
 - `tablepoints(tp)`       - Toggle true/false. When true, adds open and close brackets around each point.
 - `definecoordinates(dc)` - Toggle true/false. When true, adds `x = , y = , z = ` to the coordinates in the log.
@@ -61,14 +61,14 @@ When a point is received, it is compared to the previous point. The cumulative d
 
 ### Examples
 - When `timestamp` is true:
---`123.456, 7.890, 123.456,   -- 01:23:42`
+  --`123.456, 7.890, 123.456,   -- 01:23:42`
 - When `tablepoints` is true:
---`{123.456, 7.890, 123.456},`
+  --`{123.456, 7.890, 123.456},`
 - When `definecoordinates` is true:
---`x = 123.456, y = 7.890, z = 123.456,`
+  --`x = 123.456, y = 7.890, z = 123.456,`
 - Using the command `point this is an important comment`:
---`123.456, 7.890, 123.456, -- this is an important comment`
+  --`123.456, 7.890, 123.456, -- this is an important comment`
 
 ##### Change Log
 - v1.0 23 Aug, 2023
-    -- Initial release
+  -- Initial release
