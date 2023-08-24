@@ -1,6 +1,6 @@
 _addon.name = 'pathlog'
 _addon.author = 'Duke'
-_addon.version = '1.1'
+_addon.version = '1.0'
 _addon.commands = {'pathlog', 'pl'}
 
 resources = require('resources')
@@ -30,8 +30,7 @@ local pathlog = {}
 pathlog.trackList = L{}
 
 windower.register_event('incoming chunk', function(id, data, modified, injected, blocked)
-    if not windower.ffxi.get_info().logged_in then return end
-    if not settings.logPath then return end
+    if not windower.ffxi.get_info().logged_in or not settings.logPath or not id == 0x0E then return end
 
     local packet = packets.parse('incoming', data)
     local npc = {}
@@ -43,6 +42,7 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
     npc.polutils = packet['polutils_name']
 
     if pathlog.willScan(npc.look, npc.polutils) and npc.id then
+        -- pos.rot = packet['Rotation']
         -- walkCount = packet['Walk Count'] -- on the shelf until v2
 
         pos.x = packet['X']
@@ -58,8 +58,7 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
 end)
 
 windower.register_event('outgoing chunk', function(id, data, modified, injected, blocked)
-    if not windower.ffxi.get_info().logged_in then return end
-    if not settings.logPath then return end
+    if not windower.ffxi.get_info().logged_in or not settings.logPath then return end
 
     if settings.mode == 'target' then
         pathlog.logSelfByTarget()
@@ -101,7 +100,7 @@ function pathlog.logNpcByTarget(npcID, x, y, z)
         local targetName = target.name
         local id = target.id
         local index = target.index
-        local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
+        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
         local openBracket = settings.tableEachPoint and '{ ' or ''
         local closeBracket = settings.tableEachPoint and ' }' or ''
@@ -143,7 +142,7 @@ function pathlog.logNpcByList(npcID, x, y, z)
             local targetName = target.name
             local id = target.id
             local index = target.index
-            local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
+            local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
             local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
             local openBracket = settings.tableEachPoint and '{ ' or ''
             local closeBracket = settings.tableEachPoint and ' }' or ''
@@ -178,7 +177,7 @@ function pathlog.logSelfByTarget()
     if target and target.index == player.index then
         local playerName = player.name
         local targetName = target.name
-        local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'.log')
+        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'.log')
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
         local openBracket = settings.tableEachPoint and '{ ' or ''
         local closeBracket = settings.tableEachPoint and ' }' or ''
@@ -215,7 +214,7 @@ function pathlog.logPointWithComment(comment)
     if target then
         local playerName = player.name
         local targetName = target.name
-        local logFile = files.new('data/'..playerName..'/'..zone..'/'..targetName..'.log')
+        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'.log')
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
         local openBracket = settings.tableEachPoint and '{ ' or ''
         local closeBracket = settings.tableEachPoint and ' }' or ''
@@ -245,13 +244,13 @@ function pathlog.shouldLogPoint(logFile, x, y, z)
     local lastLine = readLines[#readLines - 1]
     local chars = '}{xyz= '
 
+    if x == 0 and y == 0 and z == 0 then
+        return false
+    end
+
     if not readLines or not lastLine or settings.all then
         return true
     end
-
-    --[[if x == 0 and y == 0 and z == 0 then
-        return false
-    end]]
 
     local lastX = lastLine:split(',')[1]:stripchars(chars)
     local lastY = lastLine:split(',')[2]:stripchars(chars)
@@ -359,22 +358,26 @@ commands.list = function(args)
     end
 
     if option == 'add' or option == 'a' then
-        if id then
+        if id and not pathlog.trackList:contains(id) then
             pathlog.trackList:append(id)
             windower.add_to_chat(settings.messageColor, 'Added '..id.. ' to tracking list. ')
         else
             windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to add to tracking list.')
         end
     elseif option == 'remove' or option == 'r' then
-        if id then
+        if id and pathlog.trackList:contains(id) then
             pathlog.trackList:remove(id)
             windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
         else
             windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to remove from tracking list.')
         end
     elseif option == 'clear' or option == 'c' then
-        pathlog.trackList:clear()
-        windower.add_to_chat(settings.messageColor, 'Cleared tracking list! ')
+        if not pathlog.trackList:empty() then
+            pathlog.trackList:clear()
+            windower.add_to_chat(settings.messageColor, 'Cleared tracking list! ')
+        else
+            windower.add_to_chat(settings.messageColor, 'Trackling list is empty.')
+        end
     end
 end
 

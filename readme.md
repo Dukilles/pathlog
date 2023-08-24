@@ -1,7 +1,7 @@
 # Pathlog
 
 - Author: Duke
-- Version 1.1
+- Version 1.0
 - Pathlog is a tool to log the path of a mob, npc, or player. Its primary purpose is recording the path of a mob or npc for use in a script. The output
 can be customized to the desired format, then copied to the clipboard for pasting into a script. The mode of capture can be set to either use
 the player's cursor target or player can create a list. Be sure to read and understand the settings, then adjust them to fit your project before starting
@@ -70,8 +70,6 @@ When a point is received, it is compared to the previous point. The cumulative d
   - `123.456, 7.890, 123.456, -- this is an important comment`
 
 ##### Change Log
-- v1.0 22 Aug, 2023
-  - Initial release
 
-- v1.1 23 Aug, 2023
-  - Added padding and fixed a bug with brackets causing errors in diff calculation.
+- v1.0 24 Aug, 2023
+  - Initial release
