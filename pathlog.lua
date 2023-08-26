@@ -219,8 +219,8 @@ function pathlog.logPointWithComment(comment)
         local openBracket = settings.tableEachPoint and '{ ' or ''
         local closeBracket = settings.tableEachPoint and ' }' or ''
         local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and ' y = ' or ' '
-        local defineZ = settings.defineCoordinates and ' z = ' or ' '
+        local defineY = settings.defineCoordinates and ' y = ' or ''
+        local defineZ = settings.defineCoordinates and ' z = ' or ''
         local x = string.format('%.3f', target.x)
         local y = string.format('%.3f', target.z) -- Windower has Z and Y axis swapped
         local z = string.format('%.3f', target.y)
