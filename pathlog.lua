@@ -239,7 +239,7 @@ function pathlog.logPointWithComment(comment)
         y = pathlog.padCoords(y, true)
         z = pathlog.padCoords(z)
 
-        logFile:append(string.format("%s%s%.3f,%s%.3f,%s%.3f%s,   %s    -- %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp, comment))
+        logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s    -- %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp, comment))
     end
 end
 
