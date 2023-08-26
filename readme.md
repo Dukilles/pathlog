@@ -38,10 +38,10 @@ Once loaded, the following commands are available via `//pathlog` or `//pl` for 
 - `point(p) ...`          - Adds a point to the logs with any further arguments as a comment.
 
 Pathlog will use the following folder structure for mobs and npcs:
-- `pathlog/data/playerName/zoneName/mobName/[mobIndex]mobID.log`
+- `pathlog/data/pathlogs/playerName/zoneName/mobName/[mobIndex]mobID.log`
 
 Pathlog will use the following folder structure for self targeted path logs:
-- `pathlog/data/playerName/zoneName/playerName.log`
+- `pathlog/data/pathlogs/playerName/zoneName/playerName.log`
 
 Pathlog will use the following settings (adjusted with commands above) to determine if a point should be logged:
 When a point is received, it is compared to the previous point. The cumulative difference is the total difference between the current point and the previous point. If the cumulative difference is greater than the cumulative difference setting, the point is logged. If the cumulative difference is less than the cumulative difference setting, the x, y, and z differences are compared to their respective settings. If any of the differences are greater than their respective settings, the point is logged. If none of the differences are greater than their respective settings, the point is not logged. If the `all` setting is true, the point is logged regardless of the above calculations.
