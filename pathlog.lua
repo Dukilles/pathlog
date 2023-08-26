@@ -221,9 +221,9 @@ function pathlog.logPointWithComment(comment)
         local defineX = settings.defineCoordinates and 'x = ' or ''
         local defineY = settings.defineCoordinates and ' y = ' or ' '
         local defineZ = settings.defineCoordinates and ' z = ' or ' '
-        local x = target.x
-        local y = target.z -- Windower has Z and Y axis swapped
-        local z = target.y
+        local x = string.format('%.3f', target.x)
+        local y = string.format('%.3f', target.z) -- Windower has Z and Y axis swapped
+        local z = string.format('%.3f', target.y)
 
         if not comment then
             comment = ''
