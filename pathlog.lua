@@ -382,6 +382,9 @@ commands.list = function(args)
         else
             windower.add_to_chat(settings.messageColor, 'Trackling list is empty.')
         end
+    else
+        commands.help()
+        return
     end
 end
 
