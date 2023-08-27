@@ -71,5 +71,5 @@ When a point is received, it is compared to the previous point. The cumulative d
 
 ##### Change Log
 
-- v1.0 24 Aug, 2023
+- v1.0 27 Aug, 2023
   - Initial release
