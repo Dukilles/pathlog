@@ -32,6 +32,7 @@ Once loaded, the following commands are available via `//pathlog` or `//pl` for 
   - `x`                    - Change the value of the x difference setting.
   - `y`                    - Change the value of the y difference setting.
   - `z`                    - Change the value of the z difference setting.
+- `rot(r)`                - Toggle true/false. When true, adds rot to each line of the log.
 - `timestamp(ts)`         - Toggle true/false. When true, adds a timestamp to each line of the log.
 - `tablepoints(tp)`       - Toggle true/false. When true, adds open and close brackets around each point.
 - `definecoordinates(dc)` - Toggle true/false. When true, adds `x = , y = , z = ` to the coordinates in the log.
@@ -66,6 +67,8 @@ When a point is received, it is compared to the previous point. The cumulative d
   - `{123.456, 7.890, 123.456},`
 - When `definecoordinates` is true:
   - `x = 123.456, y = 7.890, z = 123.456,`
+- When `rot` is true:
+  - `123.456, 7.890, 123.456, 254`
 - Using the command `point this is an important comment`:
   - `123.456, 7.890, 123.456, -- this is an important comment`
 
@@ -73,3 +76,6 @@ When a point is received, it is compared to the previous point. The cumulative d
 
 - v1.0 27 Aug, 2023
   - Initial release
+
+- v1.1 29 Aug, 2023
+  - Add rot option to mob/npc logs

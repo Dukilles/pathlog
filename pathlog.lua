@@ -15,6 +15,7 @@ defaults.messageColor = 219
 defaults.logPath = false
 defaults.mode = 'target'
 defaults.TimestampFormat = '-- %H:%M:%S'
+defaults.logRot = false
 defaults.AddTimestamp = true
 defaults.tableEachPoint = false
 defaults.defineCoordinates = false
@@ -42,17 +43,16 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
     npc.polutils = packet['polutils_name']
 
     if pathlog.willScan(npc.look, npc.polutils) and npc.id then
-        -- pos.rot = packet['Rotation']
-        -- walkCount = packet['Walk Count'] -- on the shelf until v2
-
+        pos.rot = packet['Rotation']
+        walkCount = packet['Walk Count'] -- on the shelf until v2
         pos.x = packet['X']
         pos.y = packet['Z'] -- Windower has Z and Y axis swapped
         pos.z = packet['Y']
 
         if settings.mode == 'target' then
-            pathlog.logNpcByTarget(npc.id, pos.x, pos.y, pos.z)
+            pathlog.logNpcByTarget(npc.id, pos.x, pos.y, pos.z, pos.rot)
         elseif settings.mode == 'list' then
-            pathlog.logNpcByList(npc.id, pos.x, pos.y, pos.z)
+            pathlog.logNpcByList(npc.id, pos.x, pos.y, pos.z, pos.rot)
         end
     end
 end)
@@ -69,11 +69,15 @@ windower.register_event('zone change', function(new, old)
     pathlog.trackList:clear()
 end)
 
-pathlog.caluclateCoordLen = function(isY)
+pathlog.caluclateCoordLen = function(isY, isRot)
     local len = 8
 
     if isY then
-        len = len - 1
+        len = - 1
+    end
+
+    if isRot then
+        len = len - 5
     end
 
     return len
@@ -84,13 +88,13 @@ pathlog.padLeft = function(str, length, char)
     return padded
 end
 
-pathlog.padCoords = function(coord, isY)
-    local padding = pathlog.caluclateCoordLen(isY)
+pathlog.padCoords = function(coord, isY, isRot)
+    local padding = pathlog.caluclateCoordLen(isY, isRot)
 
     return pathlog.padLeft(coord, padding)
 end
 
-function pathlog.logNpcByTarget(npcID, x, y, z)
+function pathlog.logNpcByTarget(npcID, x, y, z, rot)
     local player = windower.ffxi.get_player()
     local target = windower.ffxi.get_mob_by_target('t')
     local zone = resources.zones[windower.ffxi.get_info().zone].name
@@ -107,6 +111,8 @@ function pathlog.logNpcByTarget(npcID, x, y, z)
         local defineX = settings.defineCoordinates and 'x = ' or ''
         local defineY = settings.defineCoordinates and 'y = ' or ''
         local defineZ = settings.defineCoordinates and 'z = ' or ''
+        local defineRot = settings.defineCoordinates and 'rot = ' or ''
+        local logRot
 
         if not logFile:exists() then
             logFile:create()
@@ -116,17 +122,20 @@ function pathlog.logNpcByTarget(npcID, x, y, z)
             local x = string.format('%.3f', x)
             local y = string.format('%.3f', y)
             local z = string.format('%.3f', z)
+            local rot = string.format('%i', rot)
 
             x = pathlog.padCoords(x)
             y = pathlog.padCoords(y, true)
             z = pathlog.padCoords(z)
+            rot = pathlog.padCoords(rot, false, true)
+            logRot = settings.logRot and rot or ''
 
-            logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
+            logFile:append(string.format("%s%s%s, %s%s, %s%s, %s%s%s    %s\n", openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
         end
     end
 end
 
-function pathlog.logNpcByList(npcID, x, y, z)
+function pathlog.logNpcByList(npcID, x, y, z, rot)
     local player = windower.ffxi.get_player()
     local zone = resources.zones[windower.ffxi.get_info().zone].name
     local trackList = pathlog.trackList
@@ -149,6 +158,9 @@ function pathlog.logNpcByList(npcID, x, y, z)
             local defineX = settings.defineCoordinates and 'x = ' or ''
             local defineY = settings.defineCoordinates and 'y = ' or ''
             local defineZ = settings.defineCoordinates and 'z = ' or ''
+            local defineRot = settings.defineCoordinates and 'rot = ' or ''
+            local logRot
+
 
             if not logFile:exists() then
                 logFile:create()
@@ -158,12 +170,15 @@ function pathlog.logNpcByList(npcID, x, y, z)
                 local x = string.format('%.3f', x)
                 local y = string.format('%.3f', y)
                 local z = string.format('%.3f', z)
+                local rot = string.format('%i', rot)
 
                 x = pathlog.padCoords(x)
                 y = pathlog.padCoords(y, true)
                 z = pathlog.padCoords(z)
+                rot = pathlog.padCoords(rot, false, true)
+                logRot = settings.logRot and rot or ''
 
-                logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
+                logFile:append(string.format("%s%s%s, %s%s, %s%s, %s%s%s    %s\n", openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
             end
         end
     end
@@ -452,6 +467,22 @@ commands.ts = function()
     return commands.timestamp()
 end
 
+commands.rot = function()
+    if settings.logRot == true then
+        settings.logRot = false
+        windower.add_to_chat(settings.messageColor, 'Add rot to logs = FALSE')
+    elseif settings.logRot == false then
+        settings.logRot = true
+        windower.add_to_chat(settings.messageColor, 'Add rot to logs = TRUE')
+    end
+
+    settings:save()
+end
+
+commands.r = function()
+    return commands.rot()
+end
+
 commands.tablepoints = function()
     if settings.tableEachPoint == true then
         settings.tableEachPoint = false
@@ -502,6 +533,7 @@ commands.help = function()
     windower.add_to_chat(settings.messageColor, '//pathlog all(a) - log all positions without difference filtering (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog diff(d) cumulative(c)|x|y|z (value)- set diff required between points to log (default cumulative 4, x = 3, y = 0.5, z = 3)')
     windower.add_to_chat(settings.messageColor, '//pathlog timestamp(ts) - toggle timestamp in log (default TRUE)')
+    windower.add_to_chat(settings.messageColor, '//pathlog rot(r) - toggle rot in log (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog tablepoints(tp) - toggle table each path point (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog definecoordinates(dc) - toggle define coordinates (x = #) (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
