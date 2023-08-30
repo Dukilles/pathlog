@@ -14,6 +14,7 @@ defaults = {}
 defaults.messageColor = 219
 defaults.logPath = false
 defaults.mode = 'target'
+defaults.filter = 'rot'
 defaults.TimestampFormat = '-- %H:%M:%S'
 defaults.logRot = false
 defaults.AddTimestamp = true
@@ -29,6 +30,7 @@ settings = config.load(defaults)
 
 local pathlog = {}
 pathlog.trackList = L{}
+pathlog.rotList = L{}
 
 windower.register_event('incoming chunk', function(id, data, modified, injected, blocked)
     if not windower.ffxi.get_info().logged_in or not settings.logPath or not id == 0x0E then return end
@@ -67,6 +69,7 @@ end)
 
 windower.register_event('zone change', function(new, old)
     pathlog.trackList:clear()
+    pathlog.rotList:clear()
 end)
 
 pathlog.caluclateCoordLen = function(isY, isRot)
@@ -118,7 +121,7 @@ function pathlog.logNpcByTarget(npcID, x, y, z, rot)
             logFile:create()
         end
 
-        if pathlog.shouldLogPoint(logFile, x, y, z) then
+        if pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot) then
             local x = string.format('%.3f', x)
             local y = string.format('%.3f', y)
             local z = string.format('%.3f', z)
@@ -161,12 +164,11 @@ function pathlog.logNpcByList(npcID, x, y, z, rot)
             local defineRot = settings.defineCoordinates and 'rot = ' or ''
             local logRot
 
-
             if not logFile:exists() then
                 logFile:create()
             end
 
-            if pathlog.shouldLogPoint(logFile, x, y, z) then
+            if pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot) then
                 local x = string.format('%.3f', x)
                 local y = string.format('%.3f', y)
                 local z = string.format('%.3f', z)
@@ -186,12 +188,14 @@ end
 
 function pathlog.logSelfByTarget()
     local player = windower.ffxi.get_player()
+    local me = windower.ffxi.get_mob_by_target('me')
     local target = windower.ffxi.get_mob_by_target('t')
     local zone = resources.zones[windower.ffxi.get_info().zone].name
 
     if target and target.index == player.index then
         local playerName = player.name
         local targetName = target.name
+        local ID = target.id
         local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'.log')
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
         local openBracket = settings.tableEachPoint and '{ ' or ''
@@ -202,21 +206,29 @@ function pathlog.logSelfByTarget()
         local x = target.x
         local y = target.z -- Windower has Z and Y axis swapped
         local z = target.y
+        local rot = headingToByteRotation(me.heading)
+        local defineRot = settings.defineCoordinates and 'rot = ' or ''
+        local logRot
 
         if not logFile:exists() then
             logFile:create()
         end
 
-        if pathlog.shouldLogPoint(logFile, x, y, z) then
+        if pathlog.shouldLogPoint(logFile, ID, x, y, z, rot) then
             local x = string.format('%.3f', x)
             local y = string.format('%.3f', y)
             local z = string.format('%.3f', z)
+            local rot = string.format('%i', rot)
 
             x = pathlog.padCoords(x)
             y = pathlog.padCoords(y, true)
             z = pathlog.padCoords(z)
+            rot = pathlog.padCoords(rot, false, true)
+            logRot = settings.logRot and rot or ''
 
-            logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp))
+            logFile:append(string.format("%s%s%s, %s%s, %s%s, %s%s%s    %s\n", openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
+            pathlog.rotList:append(ID)
+            pathlog.rotList:append(rot)
         end
     end
 end
@@ -239,6 +251,9 @@ function pathlog.logPointWithComment(comment)
         local x = string.format('%.3f', target.x)
         local y = string.format('%.3f', target.z) -- Windower has Z and Y axis swapped
         local z = string.format('%.3f', target.y)
+        local rot = string.format('%i', headingToByteRotation(me.heading))
+        local defineRot = settings.defineCoordinates and 'rot = ' or ''
+        local logRot
 
         if not comment then
             comment = ''
@@ -253,12 +268,14 @@ function pathlog.logPointWithComment(comment)
         x = pathlog.padCoords(x)
         y = pathlog.padCoords(y, true)
         z = pathlog.padCoords(z)
+        rot = pathlog.padCoords(rot, false, true)
+        logRot = settings.logRot and rot or ''
 
-        logFile:append(string.format("%s%s%s, %s%s, %s%s%s,   %s    -- %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp, comment))
+        logFile:append(string.format("%s%s%s, %s%s, %s%s, %s%s%s,   %s    -- %s\n", openBracket, defineX, x, defineY, y, defineZ, z, closeBracket, timestamp, comment))
     end
 end
 
-function pathlog.shouldLogPoint(logFile, x, y, z)
+function pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot)
     local readLines = files.readlines(logFile)
     local lastLine = readLines[#readLines - 1]
     local chars = '}{xyz= '
@@ -279,11 +296,45 @@ function pathlog.shouldLogPoint(logFile, x, y, z)
     local zDiff = math.abs(lastZ - z)
     local cumulativeDiff = xDiff + yDiff + zDiff
 
-    if cumulativeDiff >= settings.cumulativeDiff or xDiff >= settings.xDiff or yDiff >= settings.yDiff or zDiff >= settings.zDiff then
-        return true
+    if rot and settings.filter == 'rot' then -- ideally this functions well enough to replace diff as the default filter as we are only concerned with elevation changes and straight lines
+        local lastRot = getLastRotByID(npcID)
+
+        if not lastRot then
+            return true
+        end
+
+        if yDiff >= settings.yDiff or tonumber(lastRot) ~= tonumber(rot) then
+            pathlog.rotList:append(npcID)
+            pathlog.rotList:append(rot)
+            return true
+        end
+    elseif settings.filter == 'diff' or not rot then
+        if cumulativeDiff >= settings.cumulativeDiff or xDiff >= settings.xDiff or yDiff >= settings.yDiff or zDiff >= settings.zDiff then
+            return true
+        end
     end
 
     return false
+end
+
+function getLastRotByID(id)
+    local rotList = pathlog.rotList
+
+    for entry = #rotList , 1, -1 do
+        if rotList[entry] == id then
+            return rotList[entry + 1]
+        end
+    end
+end
+
+function headingToByteRotation(oldHeading)
+    local newHeading = oldHeading
+
+    if newHeading < 0 then
+        newHeading = (math.pi * 2) - (newHeading * -1)
+    end
+
+    return math.round((newHeading / (math.pi * 2)) * 256)
 end
 
 function pathlog.willScan(look, polutils)
@@ -334,6 +385,29 @@ end
 
 commands.m = function(args)
     return commands.mode(args)
+end
+
+commands.filter = function(args)
+    local newFilter = args:remove(1)
+
+    if newFilter == 'd' then
+        newFilter = 'diff'
+    elseif newFilter == 'r' then
+        newFilter = 'rot'
+    end
+
+    if newFilter == 'diff' or newFilter == 'rot' then
+        settings.filter = newFilter
+        windower.add_to_chat(settings.messageColor, 'Pathlog filter: '..settings.filter)
+    else
+        commands.help()
+    end
+
+    settings:save()
+end
+
+commands.f = function(args)
+    return commands.filter(args)
 end
 
 commands.list = function(args)
@@ -528,7 +602,8 @@ commands.help = function()
     windower.add_to_chat(settings.messageColor, 'pathlog (or //pl)')
     windower.add_to_chat(settings.messageColor, '//pathlog start(st) - Begin logging targeted entity\'s path')
     windower.add_to_chat(settings.messageColor, '//pathlog stop(sp) - Stop logging targeted entity\'s path')
-    windower.add_to_chat(settings.messageColor, '//pathlog mode(m) target(t)|list(l) - change tracking mode from cursor target to a set list (default target))')
+    windower.add_to_chat(settings.messageColor, '//pathlog mode(m) target(t)|list(l) - change tracking mode between cursor target and a set list (default target)')
+    windower.add_to_chat(settings.messageColor, '//pathlog filter(f) diff(d)|rot(r) - change filter between diff and rot. Will always use 0.5 y diff (default rot)')
     windower.add_to_chat(settings.messageColor, '//pathlog list(l) add(a)|remove(r)|show(s) ID - In list mode, add/remove ID|target to/from tracking list.')
     windower.add_to_chat(settings.messageColor, '//pathlog all(a) - log all positions without difference filtering (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog diff(d) cumulative(c)|x|y|z (value)- set diff required between points to log (default cumulative 4, x = 3, y = 0.5, z = 3)')
