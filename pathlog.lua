@@ -75,15 +75,16 @@ windower.register_event('target change', function(index)
     if settings.mode == 'target' then
         local ghostLog = pathlog.ghostLog
 
-        if #ghostLog <= 0 then return end
+        if #ghostLog > 0 then
 
-        for entry = 1, #ghostLog do
-            local isFirst = false
-            local isFinal = true
+            for entry = 1, #ghostLog do
+                local isFirst = false
+                local isFinal = true
 
-            pathlog.logFirstOrFinalPoint(isFirst, isFinal, tonumber(ghostLog[entry][1]), ghostLog[entry][2], ghostLog[entry][3], ghostLog[entry][4], ghostLog[entry][5])
+                pathlog.logFirstOrFinalPoint(isFirst, isFinal, tonumber(ghostLog[entry][1]), ghostLog[entry][2], ghostLog[entry][3], ghostLog[entry][4], ghostLog[entry][5])
+            end
+            ghostLog:clear()
         end
-        ghostLog:clear()
     end
 end)
 
@@ -395,31 +396,33 @@ function pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot)
         if yDiff >= settings.yDiff or rotDiff > settings.rotDiff then
             local ghostLog = pathlog.ghostLog
 
-            if #ghostLog <= 0 then return end
-            for entry = 1, #ghostLog do
-                if npcID == tonumber(ghostLog[entry][1]) then
-                    ghostLog:delete(ghostLog[entry])
-                    pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot):split(','))
-                    break
+            if #ghostLog > 0 then
+                for entry = 1, #ghostLog do
+                    if npcID == tonumber(ghostLog[entry][1]) then
+                        ghostLog:delete(ghostLog[entry])
+                        pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot):split(','))
+                        break
+                    end
                 end
-            end
 
-            return true
+                return true
+            end
         end
     elseif settings.filter == 'xyz' then
         if cumulativeDiff >= settings.cumulativeDiff or xDiff >= settings.xDiff or yDiff >= settings.yDiff or zDiff >= settings.zDiff then
             local ghostLog = pathlog.ghostLog
 
-            if #ghostLog <= 0 then return end
-            for entry = 1, #ghostLog do
-                if npcID == tonumber(ghostLog[entry][1]) then
-                    ghostLog:delete(ghostLog[entry])
-                    pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot):split(','))
-                    break
+            if #ghostLog > 0 then
+                for entry = 1, #ghostLog do
+                    if npcID == tonumber(ghostLog[entry][1]) then
+                        ghostLog:delete(ghostLog[entry])
+                        pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot):split(','))
+                        break
+                    end
                 end
-            end
 
-            return true
+                return true
+            end
         end
     end
 
@@ -468,16 +471,16 @@ end
 commands.stop = function()
     local ghostLog = pathlog.ghostLog
 
-    if #ghostLog <= 0 then return end
+    if #ghostLog > 0 then
+        for entry = 1, #ghostLog do
+            local isFirst = false
+            local isFinal = true
 
-    for entry = 1, #ghostLog do
-        local isFirst = false
-        local isFinal = true
-
-        pathlog.logFirstOrFinalPoint(isFirst, isFinal, tonumber(ghostLog[entry][1]), ghostLog[entry][2], ghostLog[entry][3], ghostLog[entry][4], ghostLog[entry][5])
+            pathlog.logFirstOrFinalPoint(isFirst, isFinal, tonumber(ghostLog[entry][1]), ghostLog[entry][2], ghostLog[entry][3], ghostLog[entry][4], ghostLog[entry][5])
+        end
+        ghostLog:clear()
     end
 
-    ghostLog:clear()
     settings.logPath = false
     windower.add_to_chat(settings.messageColor, 'Path logging OFF')
 end
@@ -582,16 +585,16 @@ commands.list = function(args)
             if settings.logPath then -- if removing an id while logging, log the final point and remove from ghost log
                 local ghostLog = pathlog.ghostLog
 
-                if #ghostLog <= 0 then return end
+                if #ghostLog > 0 then
+                    for entry = 1, #ghostLog do
+                        local isFirst = false
+                        local isFinal = true
 
-                for entry = 1, #ghostLog do
-                    local isFirst = false
-                    local isFinal = true
-
-                    if id == tonumber(ghostLog[entry][1]) then
-                        pathlog.logFirstOrFinalPoint(isFirst, isFinal, tonumber(ghostLog[entry][1]), ghostLog[entry][2], ghostLog[entry][3], ghostLog[entry][4], ghostLog[entry][5])
-                        ghostLog:delete(ghostLog[entry])
-                        break
+                        if id == tonumber(ghostLog[entry][1]) then
+                            pathlog.logFirstOrFinalPoint(isFirst, isFinal, tonumber(ghostLog[entry][1]), ghostLog[entry][2], ghostLog[entry][3], ghostLog[entry][4], ghostLog[entry][5])
+                            ghostLog:delete(ghostLog[entry])
+                            break
+                        end
                     end
                 end
             end
