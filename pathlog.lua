@@ -47,7 +47,7 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
     npc.polutils = packet['polutils_name']
 
     if pathlog.willScan(npc.look, npc.polutils) and npc.id then
-        walkCount = packet['Walk Count'] -- on the shelf until v2
+        walkCount = packet['Walk Count'] -- not currently in use
         pos.x = packet['X']
         pos.y = packet['Z'] -- Windower has Z and Y axis swapped
         pos.z = packet['Y']
