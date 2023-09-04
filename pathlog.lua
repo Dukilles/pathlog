@@ -83,7 +83,7 @@ windower.register_event('target change', function(index)
             local isFinal = true
 
             for entry = #ghostLog, 1, -1 do
-                local id = ghostLog[entry][1]
+                local id = tonumber(ghostLog[entry][1])
                 local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(tonumber(id))
 
                 pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
