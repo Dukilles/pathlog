@@ -566,7 +566,9 @@ commands.stop = function()
                 local isFinal = true
                 local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
 
-                pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
+                if lastX and lastY and lastZ then
+                    pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
+                end
 
                 for entry = #ghostLog, 1, -1 do
                     if id == tonumber(ghostLog[entry][1]) then
@@ -700,7 +702,9 @@ commands.list = function(args)
                     local isFinal = true
                     local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
 
-                    pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
+                    if lastX and lastY and lastZ then
+                        pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
+                    end
 
                     for entry = #ghostLog, 1, -1 do
                         if id == tonumber(ghostLog[entry][1]) then
