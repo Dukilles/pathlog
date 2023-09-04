@@ -385,13 +385,13 @@ function pathlog.closeBracketOnly(npcID)
         local index = target.index
         local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
 
-        logFile:append(string.format('\n},\n'))
+        logFile:append(string.format('},\n'))
     elseif target and player.id == npcID then
         local playerName = player.name
         local ID = target.id
         local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
 
-        logFile:append(string.format('\n},\n'))
+        logFile:append(string.format('},\n'))
     end
 end
 
