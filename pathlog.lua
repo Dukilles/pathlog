@@ -714,7 +714,8 @@ commands.list = function(args)
                 end
             end
 
-            pathlog.trackList:remove(pathlog.trackList[id])
+            pathlog.trackList:remove(entry)
+
             windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
         else
             windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to remove from tracking list.')
