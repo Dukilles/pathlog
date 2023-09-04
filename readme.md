@@ -1,7 +1,7 @@
 # Pathlog
 
 - Author: Duke
-- Version 2.0
+- Version 2.0 *BUG* / *UNSTABLE*
 - Pathlog is a tool to log the path of a mob, npc, or player. Its primary purpose is recording the path of a mob or npc for use in a script. The output
 can be customized to the desired format, then copied to the clipboard for pasting into a script. The mode of capture can be set to either use
 the player's cursor target or player can create a list. Be sure to read and understand the settings, then adjust them to fit your project before starting
