@@ -772,6 +772,9 @@ commands.diff = function(args)
     elseif option == 'rot' then
         settings.rotDiff = value
         windower.add_to_chat(settings.messageColor, 'rot Diff = '..settings.rotDiff)
+    elseif option == 'time' or option == 't' then
+        settings.timeDiff = value
+        windower.add_to_chat(settings.messageColor, 'time Diff = '..settings.timeDiff)
     else
         windower.add_to_chat(settings.messageColor, 'Valid arguments are cumulative(c), x, y, z, or rot followed by a number')
         return
@@ -848,6 +851,22 @@ commands.dc = function()
     return commands.definecoordinates()
 end
 
+commands.pauselegs = function()
+    if settings.pauseLegs == true then
+        settings.pauseLegs = false
+        windower.add_to_chat(settings.messageColor, 'In list mode, divide pauses into path legs = FALSE')
+    elseif settings.pauseLegs == false then
+        settings.pauseLegs = true
+        windower.add_to_chat(settings.messageColor, 'In list mode, divide pauses into path legs = TRUE')
+    end
+
+    settings:save()
+end
+
+commands.pl = function()
+    return commands.pauselegs()
+end
+
 commands.point = function(args)
     pathlog.logPointWithComment(args)
     windower.add_to_chat(settings.messageColor, 'Point added to logs')
@@ -865,11 +884,13 @@ commands.help = function()
     windower.add_to_chat(settings.messageColor, '//pathlog filter(f) xyz|rot(r) - change filter between xyz diff and rot diff. Will always use 0.5 y diff (default rot)')
     windower.add_to_chat(settings.messageColor, '//pathlog list(l) add(a)|remove(r)|show(s) ID - In list mode, add/remove ID|target to/from tracking list.')
     windower.add_to_chat(settings.messageColor, '//pathlog all(a) - log all positions without difference filtering (default FALSE)')
-    windower.add_to_chat(settings.messageColor, '//pathlog diff(d) cumulative(c)|x|y|z|rot (value) - set diff required between points to log (default cumulative 4, x = 3, y = 0.5, z = 3, rot = 2)')
+    windower.add_to_chat(settings.messageColor, '//pathlog diff(d) cumulative(c)|x|y|z|rot|time(t) (value) - set diffs required between points to log or split')
+    windower.add_to_chat(settings.messageColor, 'diff defaults: cumulative 4, x = 3, y = 0.5, z = 3, rot = 0, time = 4')
     windower.add_to_chat(settings.messageColor, '//pathlog timestamp(ts) - toggle timestamp in log (default TRUE)')
     windower.add_to_chat(settings.messageColor, '//pathlog rot(r) - toggle rot in log (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog tablepoints(tp) - toggle table each path point (default FALSE)')
     windower.add_to_chat(settings.messageColor, '//pathlog definecoordinates(dc) - toggle define coordinates (x = #) (default FALSE)')
+    windower.add_to_chat(settings.messageColor, '//pathlog pauselegs(pl) - In list mode, auto divide mob/npc pauses into separate path legs (default TRUE)')
     windower.add_to_chat(settings.messageColor, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
 end
 
