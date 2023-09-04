@@ -12,7 +12,7 @@ to see a red dot on FFXIDB minimap in my experience).
 
 ### Install and Load
 
-Download, extract to addons folder, and `//lua load pathlog` in game ( or `//lua l pathlog`).
+Download, extract to addons folder, change the name of the folder from `pathlog-master` to `pathlog` and `//lua load pathlog` in game ( or `//lua l pathlog`).
 
 ### Commands and Settings
 
