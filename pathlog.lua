@@ -116,9 +116,8 @@ windower.register_event('target change', function(index)
 
         for entry = #ghostLog, 1, -1 do
             local id = tonumber(ghostLog[entry][1])
-            local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
 
-            pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
+            pathlog.closeLeg(id)
             break
         end
 
@@ -186,7 +185,7 @@ function pathlog.shouldLogPoint(id, x, y, z, rot, time)
         return false
     end
 
-    if not lastLoggedX or not lastLoggedY or not lastLoggedZ or not lastLoggedRot then
+    if not (lastLoggedX or lastLoggedY or lastLoggedZ or lastLoggedRot) then
         pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
         pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
         pathlog.logToFile(logType.firstPoint, id, x, y, z, rot, time)
@@ -201,17 +200,7 @@ function pathlog.shouldLogPoint(id, x, y, z, rot, time)
     local timeDiff = math.abs(lastTime - time)
 
     if timeDiff >= settings.timeDiff and settings.pauseLegs and settings.mode == 'list' and #pathlog.ghostLog > 0 then
-        local loggedLastDiffX = math.abs(lastLoggedX - lastX)
-        local loggedLastDiffY = math.abs(lastLoggedY - lastY)
-        local loggedLastDiffZ = math.abs(lastLoggedZ - lastZ)
-        local loggedLastDiffRot = math.abs(lastLoggedRot - lastRot)
-
-        if loggedLastDiffX < 1 and loggedLastDiffY < 1 and loggedLastDiffZ < 1 and loggedLastDiffRot < 1 then
-            pathlog.logToFile(logType.closeBracket, id)
-        else
-            pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
-        end
-
+        pathlog.closeLeg(id)
         pathlog.logToFile(logType.firstPoint, id, x, y, z, rot, time)
 
         for entry = #pathlog.ghostLog, 1, -1 do
@@ -291,6 +280,22 @@ function pathlog.logPointWithComment(comment)
         end
 
         logFile:append(string.format('%s%s%s, %s%s, %s%s,%s%s%s   %s    -- %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp, comment))
+    end
+end
+
+-- Compare last logged point to last received point, if they are the same, close the leg with a close bracket, otherwise log the last point.
+function pathlog.closeLeg(id)
+    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
+    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
+    local loggedLastDiffX = math.abs(lastLoggedX - lastX)
+    local loggedLastDiffY = math.abs(lastLoggedY - lastY)
+    local loggedLastDiffZ = math.abs(lastLoggedZ - lastZ)
+    local loggedLastDiffRot = math.abs(lastLoggedRot - lastRot)
+
+    if loggedLastDiffX < 1 and loggedLastDiffY < 1 and loggedLastDiffZ < 1 and loggedLastDiffRot < 1 then
+        pathlog.logToFile(logType.closeBracket, id)
+    else
+        pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
     end
 end
 
@@ -415,11 +420,7 @@ commands.stop = function()
             local id = tonumber(trackList[entry])
 
             if #ghostLog > 0 then
-                local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
-
-                if lastX and lastY and lastZ then
-                    pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
-                end
+                pathlog.closeLeg(id)
 
                 for entry = #ghostLog, 1, -1 do
                     if id == tonumber(ghostLog[entry][1]) then
