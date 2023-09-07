@@ -201,12 +201,12 @@ function pathlog.shouldLogPoint(id, x, y, z, rot, time)
     local timeDiff = math.abs(lastTime - time)
 
     if timeDiff >= settings.timeDiff and settings.pauseLegs and settings.mode == 'list' and #pathlog.ghostLog > 0 then
-        local logLastX = math.abs(lastLoggedX - lastX)
-        local logLastY = math.abs(lastLoggedY - lastY)
-        local logLastZ = math.abs(lastLoggedZ - lastZ)
-        local logLastRot = math.abs(lastLoggedRot - lastRot)
+        local loggedLastDiffX = math.abs(lastLoggedX - lastX)
+        local loggedLastDiffY = math.abs(lastLoggedY - lastY)
+        local loggedLastDiffZ = math.abs(lastLoggedZ - lastZ)
+        local loggedLastDiffRot = math.abs(lastLoggedRot - lastRot)
 
-        if logLastX < 1 and logLastY < 1 and logLastZ < 1 and logLastRot < 1 then
+        if loggedLastDiffX < 1 and loggedLastDiffY < 1 and loggedLastDiffZ < 1 and loggedLastDiffRot < 1 then
             pathlog.logToFile(logType.closeBracket, id)
         else
             pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
