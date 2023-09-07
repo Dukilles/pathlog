@@ -1,8 +1,7 @@
 # Pathlog
 
 - Author: Duke
-- Version 2.0
-- NOTE: I had an issue where I disconnected from retail when loading pathlog. My mistake was copying the pathlog files and pasting them into the addons folder while Windower and FFXI were running. I'm not sure if this is the cause of the issue, but I would recommend closing Windower and FFXI then extracting the pathlog files into the addons folder before starting Windower and FFXI. I have not had any issues since doing this.
+- Version 2.1
 - Pathlog is a tool to log the path of a mob, npc, or player. Its primary purpose is recording the path of a mob or npc for use in a script. The output
 can be customized to the desired format, then copied to the clipboard for pasting into a script. The mode of capture can be set to either use
 the player's cursor target or player can create a list. Be sure to read and understand the settings, then adjust them to fit your project before starting
@@ -106,3 +105,6 @@ In list mode, when `pauseLegs` is true, Pathlog will divide the path into legs b
   - Add method to split path into legs by target change
   - Add ghostLog to pull from to append to end and finish a log
   - Add tabling for each leg or the entire path
+
+-v2.1 (in testing)
+  - Heavily refactored to be faster and take up fewer resources

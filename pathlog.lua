@@ -1,6 +1,6 @@
 _addon.name = 'pathlog'
 _addon.author = 'Duke'
-_addon.version = '2.0'
+_addon.version = '2.1'
 _addon.commands = {'pathlog', 'pl'}
 
 resources = require('resources')
