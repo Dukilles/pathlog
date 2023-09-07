@@ -1,6 +1,6 @@
 _addon.name = 'pathlog'
 _addon.author = 'Duke'
-_addon.version = '2.0'
+_addon.version = '2.1'
 _addon.commands = {'pathlog', 'pl'}
 
 resources = require('resources')
@@ -8,7 +8,6 @@ config = require('config')
 packets = require('packets')
 files = require('files')
 require('strings')
-require('lists')
 require('tables')
 
 defaults = {}
@@ -33,11 +32,32 @@ defaults.timeDiff = 4
 settings = config.load(defaults)
 
 local pathlog = {}
-pathlog.trackList = L{}
+local commands = {}
+pathlog.trackList = T{}
 pathlog.ghostLog = T{}
+pathlog.logFiles = T{}
 
+local logType =
+{
+    fromPacket      = 1,
+    firstPoint      = 2,
+    lastPoint       = 3,
+    closeBracket    = 4,
+}
+
+-- Windower Events --
+--------------------------------------------
+
+-- Update variables on load, login, and logout.
+windower.register_event('load', 'login', 'logout', function()
+    pathlog.logged_in = windower.ffxi.get_info().logged_in
+    pathlog.zone = pathlog.logged_in and resources.zones[windower.ffxi.get_info().zone].name
+    pathlog.player = pathlog.logged_in and windower.ffxi.get_player()
+end)
+
+-- Parse incoming packets for mob/npc position data.
 windower.register_event('incoming chunk', function(id, data, modified, injected, blocked)
-    if not windower.ffxi.get_info().logged_in or not settings.logPath or not id == 0x0E then return end
+    if not settings.logPath or not id == 0x0E or not pathlog.logged_in then return end
 
     local packet = packets.parse('incoming', data)
     local npc = {}
@@ -57,362 +77,115 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
         pos.time = os.time()
 
         if settings.mode == 'target' then
-            pathlog.logNpcByTarget(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
-        elseif settings.mode == 'list' then
-            pathlog.logNpcByList(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+            local target = windower.ffxi.get_mob_by_target('t')
+
+            if target and target.id == npc.id and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
+                pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+            end
+        elseif settings.mode == 'list' and #pathlog.trackList > 0 and pathlog.trackList:contains(npc.id) and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
+            pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
         end
     end
 end)
 
+-- Parse outgoing packets for player position data.
 windower.register_event('outgoing chunk', function(id, data, modified, injected, blocked)
-    if not windower.ffxi.get_info().logged_in or not settings.logPath then return end
+    if settings.logPath and settings.mode == 'target' and id == 0x015 and pathlog.targetIndex == pathlog.player.index and pathlog.logged_in then
+        local packet = packets.parse('outgoing', data)
+        local pos = {}
 
-    if settings.mode == 'target' then
-        pathlog.logSelfByTarget()
+        pos.x = packet['X']
+        pos.y = packet['Z'] -- Windower has Z and Y axis swapped
+        pos.z = packet['Y']
+        pos.rot = packet['Rotation']
+        pos.time = os.time()
+
+        if pathlog.shouldLogPoint(pathlog.player.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
+            pathlog.logToFile(logType.fromPacket, pathlog.player.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+        end
     end
 end)
 
+-- Update target index variable; In target mode, append last received point and close bracket leg, open new leg.
 windower.register_event('target change', function(index)
-    if not windower.ffxi.get_info().logged_in or not settings.logPath then return end
+    if pathlog.logged_in then
+        pathlog.targetIndex = index
+    end
 
-    if settings.mode == 'target' then
+    if settings.logPath and settings.mode == 'target' and #pathlog.ghostLog > 0 and pathlog.logged_in then
         local ghostLog = pathlog.ghostLog
 
-        if #ghostLog > 0 then
-            local isFirst = false
-            local isFinal = true
+        for entry = #ghostLog, 1, -1 do
+            local id = tonumber(ghostLog[entry][1])
 
-            for entry = #ghostLog, 1, -1 do
-                local id = tonumber(ghostLog[entry][1])
-                local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(tonumber(id))
-
-                pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
-                break
-            end
-            ghostLog:clear()
+            pathlog.closeLeg(id)
+            break
         end
+
+        ghostLog:clear()
     end
 end)
 
-windower.register_event('zone change', function(new, old)
+-- Update zone variable; Clear track list and ghost log.
+windower.register_event('zone change', function(new)
+    pathlog.zone = resources.zones[new].name
     pathlog.trackList:clear()
     pathlog.ghostLog:clear()
 end)
 
-pathlog.caluclateCoordLen = function(isY, isRot)
-    local len = 8
+-- Handle commands.
+windower.register_event('addon command', function(command, ...)
+    command = command and command:lower()
 
-    if isY then
-        len = len - 1
+    if commands[command] then
+        commands[command](L{...})
+    else
+        commands.help()
     end
+end)
 
-    if isRot then
-        len = len - 3
-    end
+-- Logging functions --
+--------------------------------------------
 
-    return len
-end
+-- Log to file by type.
+function pathlog.logToFile(type, id, x, y, z, rot, time)
+    local logFile = pathlog.getFilePath(id)
 
-pathlog.padLeft = function(str, length, char)
-    local padded = string.rep(char or ' ', length - #str) .. str
-
-    return padded
-end
-
-pathlog.padCoords = function(coord, isY, isRot)
-    local padding = pathlog.caluclateCoordLen(isY, isRot)
-
-    return pathlog.padLeft(coord, padding)
-end
-
-function pathlog.logNpcByTarget(npcID, x, y, z, rot, time)
-    local player = windower.ffxi.get_player()
-    local target = windower.ffxi.get_mob_by_target('t')
-    local zone = resources.zones[windower.ffxi.get_info().zone].name
-
-    if target and npcID == target.id then
-        local playerName = player.name
-        local targetName = target.name
-        local id = target.id
-        local index = target.index
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
-        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-        local logRot
-
-        if not logFile:exists() then
-            logFile:create()
-        end
-
-        if pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot, time) then
-            local x = string.format('%.3f', x)
-            local y = string.format('%.3f', y)
-            local z = string.format('%.3f', z)
-            local rot = string.format('%i,', rot)
-
-            x = pathlog.padCoords(x)
-            y = pathlog.padCoords(y, true)
-            z = pathlog.padCoords(z)
-            rot = pathlog.padCoords(rot, false, true)
-            logRot = settings.logRot and rot or ''
-
-            logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-        end
-    end
-end
-
-function pathlog.logNpcByList(npcID, x, y, z, rot, time)
-    local player = windower.ffxi.get_player()
-    local zone = resources.zones[windower.ffxi.get_info().zone].name
-    local trackList = pathlog.trackList
-
-    if #trackList <= 0 then return end
-
-    for entry = 1, #trackList do
-        local listID = trackList[entry]
-        local target = windower.ffxi.get_mob_by_id(listID)
-
-        if target and npcID == target.id then
-            local playerName = player.name
-            local targetName = target.name
-            local id = target.id
-            local index = target.index
-            local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
-            local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
-            local openBracket = settings.tableEachPoint and '{ ' or ''
-            local closeBracket = settings.tableEachPoint and ' },' or ''
-            local defineX = settings.defineCoordinates and 'x = ' or ''
-            local defineY = settings.defineCoordinates and 'y = ' or ''
-            local defineZ = settings.defineCoordinates and 'z = ' or ''
-            local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-            local logRot
-
-            if not logFile:exists() then
-                logFile:create()
-            end
-
-            if pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot, time) then
-                local x = string.format('%.3f', x)
-                local y = string.format('%.3f', y)
-                local z = string.format('%.3f', z)
-                local rot = string.format('%i,', rot)
-
-                x = pathlog.padCoords(x)
-                y = pathlog.padCoords(y, true)
-                z = pathlog.padCoords(z)
-                rot = pathlog.padCoords(rot, false, true)
-                logRot = settings.logRot and rot or ''
-
-                logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-            end
-        end
-    end
-end
-
-function pathlog.logSelfByTarget()
-    local player = windower.ffxi.get_player()
-    local me = windower.ffxi.get_mob_by_target('me')
-    local target = windower.ffxi.get_mob_by_target('t')
-    local zone = resources.zones[windower.ffxi.get_info().zone].name
-
-    if target and target.index == player.index then
-        local playerName = player.name
-        local targetName = target.name
-        local ID = target.id
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'.log')
-        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local x = target.x
-        local y = target.z -- Windower has Z and Y axis swapped
-        local z = target.y
-        local rot = headingToByteRotation(me.heading)
-        local time = os.time()
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-        local logRot
-
-        if not logFile:exists() then
-            logFile:create()
-        end
-
-        if pathlog.shouldLogPoint(logFile, ID, x, y, z, rot, time) then
-            local x = string.format('%.3f', x)
-            local y = string.format('%.3f', y)
-            local z = string.format('%.3f', z)
-            local rot = string.format('%i,', rot)
-
-            x = pathlog.padCoords(x)
-            y = pathlog.padCoords(y, true)
-            z = pathlog.padCoords(z)
-            rot = pathlog.padCoords(rot, false, true)
-            logRot = settings.logRot and rot or ''
-
-            logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-        end
-    end
-end
-
-function pathlog.logPointWithComment(comment)
-    local player = windower.ffxi.get_player()
-    local target = windower.ffxi.get_mob_by_target('me')
-    local zone = resources.zones[windower.ffxi.get_info().zone].name
-
-    if target then
-        local playerName = player.name
-        local targetName = target.name
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'.log')
-        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local x = string.format('%.3f', target.x)
-        local y = string.format('%.3f', target.z) -- Windower has Z and Y axis swapped
-        local z = string.format('%.3f', target.y)
-        local rot = string.format('%i,', headingToByteRotation(target.heading))
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-        local logRot
-
-        if not comment then
-            comment = ''
-        else
-            comment = table.sconcat(comment)
-        end
-
-        if not logFile:exists() then
-            logFile:create()
-        end
-
-        x = pathlog.padCoords(x)
-        y = pathlog.padCoords(y, true)
-        z = pathlog.padCoords(z)
-        rot = pathlog.padCoords(rot, false, true)
-        logRot = settings.logRot and rot or ''
-
-        logFile:append(string.format('%s%s%s, %s%s, %s%s,%s%s%s   %s    -- %s\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp, comment))
-    end
-end
-
-function pathlog.logFirstOrFinalPoint(isFirst, isFinal, npcID, x, y, z, rot, time)
-    local player = windower.ffxi.get_player()
-    local target = windower.ffxi.get_mob_by_id(npcID)
-    local zone = resources.zones[windower.ffxi.get_info().zone].name
-
-    if target and npcID ~= player.id then
-        local playerName = player.name
-        local targetName = target.name
-        local id = target.id
-        local index = target.index
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
-        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, time) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-        local logRot
-        local x = string.format('%.3f', x)
-        local y = string.format('%.3f', y)
-        local z = string.format('%.3f', z)
-        local rot = string.format('%i,', rot)
-
-        x = pathlog.padCoords(x)
-        y = pathlog.padCoords(y, true)
-        z = pathlog.padCoords(z)
-        rot = pathlog.padCoords(rot, false, true)
-        logRot = settings.logRot and rot or ''
-
-        if isFirst then
-            logFile:append(string.format('{\n    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-        elseif isFinal then
-            logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n},\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-        end
-
-    elseif target and player.id == npcID then
-        local playerName = player.name
-        local ID = target.id
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
-        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, time) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local x = target.x
-        local y = target.z -- Windower has Z and Y axis swapped
-        local z = target.y
-        local rot = headingToByteRotation(target.heading)
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-        local logRot
-        local x = string.format('%.3f', x)
-        local y = string.format('%.3f', y)
-        local z = string.format('%.3f', z)
-        local rot = string.format('%i,', rot)
-
-        x = pathlog.padCoords(x)
-        y = pathlog.padCoords(y, true)
-        z = pathlog.padCoords(z)
-        rot = pathlog.padCoords(rot, false, true)
-        logRot = settings.logRot and rot or ''
-
-        if isFirst then
-            logFile:append(string.format('{\n    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-        elseif isFinal then
-            logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n},\n', openBracket, defineX, x, defineY, y, defineZ, z, defineRot, logRot, closeBracket, timestamp))
-        end
-    end
-end
-
-function pathlog.closeBracketOnly(npcID)
-    local player = windower.ffxi.get_player()
-    local target = windower.ffxi.get_mob_by_id(npcID)
-    local zone = resources.zones[windower.ffxi.get_info().zone].name
-
-    if target and npcID ~= player.id then
-        local playerName = player.name
-        local targetName = target.name
-        local id = target.id
-        local index = target.index
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..targetName..'/'..id..'.log')
-
+    if type == logType.closeBracket then
         logFile:append(string.format('},\n'))
-    elseif target and player.id == npcID then
-        local playerName = player.name
-        local ID = target.id
-        local logFile = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
+        return
+    end
 
-        logFile:append(string.format('},\n'))
+    local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, time) or ''
+    local openBracket, closeBracket, defineX, defineY, defineZ, defineRot = pathlog.formatLogOutput()
+    local fx, fy, fz, frot = pathlog.formatCoords(x, y, z, rot)
+    local logRot = settings.logRot and frot or ''
+
+    if type == logType.fromPacket then
+        logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp))
+    elseif type == logType.firstPoint then
+        logFile:append(string.format('{\n    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp))
+    elseif type == logType.lastPoint then
+        logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n},\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp))
     end
 end
 
-function pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot, time)
-    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(npcID)
-    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(npcID)
+-- Checks if incoming point should be logged and returns true or false.
+-- Handles the ghost log, comparing the last logged point, last received point, and the incoming point.
+-- Handles the first point of a leg, last point of a leg, and close bracket of a leg.
+function pathlog.shouldLogPoint(id, x, y, z, rot, time)
+    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
+    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
+    local logFile = pathlog.getFilePath(id)
 
     if x == 0 and y == 0 and z == 0 then
         return false
     end
 
-    if not lastLoggedX or not lastLoggedY or not lastLoggedZ or not lastLoggedRot then
-        local isFirst = true
-        local isFinal = false
-
-        pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-        pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-        --pathlog.ghostLog:append({npcID, x, y, z, rot, time})
-        --pathlog.ghostLog:append({npcID, x, y, z, rot, time})
-
-        pathlog.logFirstOrFinalPoint(isFirst, isFinal, npcID, x, y, z, rot, time)
+    if not (lastLoggedX or lastLoggedY or lastLoggedZ or lastLoggedRot) then
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.logToFile(logType.firstPoint, id, x, y, z, rot, time)
         return false
     end
 
@@ -423,97 +196,178 @@ function pathlog.shouldLogPoint(logFile, npcID, x, y, z, rot, time)
     local rotDiff = math.abs(lastLoggedRot - rot)
     local timeDiff = math.abs(lastTime - time)
 
-    if timeDiff >= settings.timeDiff and settings.pauseLegs and settings.mode == 'list' then
-        --local ghostLog = pathlog.ghostLog
+    if timeDiff >= settings.timeDiff and settings.pauseLegs and settings.mode == 'list' and #pathlog.ghostLog > 0 then
+        pathlog.closeLeg(id)
+        pathlog.logToFile(logType.firstPoint, id, x, y, z, rot, time)
 
-        if #pathlog.ghostLog > 0 then
-            local logLastX = math.abs(lastLoggedX - lastX)
-            local logLastY = math.abs(lastLoggedY - lastY)
-            local logLastZ = math.abs(lastLoggedZ - lastZ)
-            local logLastRot = math.abs(lastLoggedRot - lastRot)
-
-            if logLastX < 1 and logLastY < 1 and logLastZ < 1 and logLastRot < 1 then
-                pathlog.closeBracketOnly(npcID)
-            else
-                pathlog.logFirstOrFinalPoint(false, true, npcID, lastX, lastY, lastZ, lastRot, lastTime)
+        for entry = #pathlog.ghostLog, 1, -1 do
+            if id == tonumber(pathlog.ghostLog[entry][1]) then
+                pathlog.ghostLog:delete(pathlog.ghostLog[entry])
             end
-
-            pathlog.logFirstOrFinalPoint(true, false, npcID, x, y, z, rot, time)
-
-            for entry = #pathlog.ghostLog, 1, -1 do
-                if npcID == tonumber(pathlog.ghostLog[entry][1]) then
-                    pathlog.ghostLog:delete(pathlog.ghostLog[entry])
-                end
-            end
-
-            pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-            pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-
-            return false
         end
+
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+
+        return false
     end
 
     if settings.all then
         return true
     end
 
-    if settings.filter == 'rot' then
-        if yDiff >= settings.yDiff or rotDiff > settings.rotDiff then
-            if #pathlog.ghostLog > 0 then
-                for entry = #pathlog.ghostLog, 1, -1 do
-                    if npcID == tonumber(pathlog.ghostLog[entry][1]) then
-                        pathlog.ghostLog:delete(pathlog.ghostLog[entry])
-                    end
-                end
-
-                pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-                pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-
-                return true
+    if settings.filter == 'rot' and  #pathlog.ghostLog > 0 and (yDiff >= settings.yDiff or rotDiff > settings.rotDiff) then
+        for entry = #pathlog.ghostLog, 1, -1 do
+            if id == tonumber(pathlog.ghostLog[entry][1]) then
+                pathlog.ghostLog:delete(pathlog.ghostLog[entry])
             end
         end
-    elseif settings.filter == 'xyz' then
-        if cumulativeDiff >= settings.cumulativeDiff or xDiff >= settings.xDiff or yDiff >= settings.yDiff or zDiff >= settings.zDiff then
-            if #pathlog.ghostLog > 0 then
-                for entry = #pathlog.ghostLog, 1, -1 do
-                    if npcID == tonumber(pathlog.ghostLog[entry][1]) then
-                        pathlog.ghostLog:delete(pathlog.ghostLog[entry])
-                    end
-                end
 
-                pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
-                pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
 
-                return true
+        return true
+    elseif settings.filter == 'xyz' and #pathlog.ghostLog > 0 and (cumulativeDiff >= settings.cumulativeDiff or xDiff >= settings.xDiff or yDiff >= settings.yDiff or zDiff >= settings.zDiff) then
+        for entry = #pathlog.ghostLog, 1, -1 do
+            if id == tonumber(pathlog.ghostLog[entry][1]) then
+                pathlog.ghostLog:delete(pathlog.ghostLog[entry])
             end
         end
+
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
+
+        return true
     end
 
     if #pathlog.ghostLog > 0 then
         for entry = #pathlog.ghostLog, 1, -1 do
-            if npcID == tonumber(pathlog.ghostLog[entry][1]) then
+            if id == tonumber(pathlog.ghostLog[entry][1]) then
                 pathlog.ghostLog:delete(pathlog.ghostLog[entry])
                 break
             end
         end
 
-        pathlog.ghostLog:append(string.format(npcID..','..x..','..y..','..z..','..rot..','..time):split(','))
+        pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
 
         return false
     end
 end
 
+-- Handle command to log a single point to player file, append comment to end.
+function pathlog.logPointWithComment(comment)
+    local target = windower.ffxi.get_mob_by_target('me')
+
+    if target then
+        local logFile = pathlog.getFilePath(target.id)
+        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
+        local openBracket, closeBracket, defineX, defineY, defineZ, defineRot = pathlog.formatLogOutput()
+        local rot = headingToByteRotation(target.heading)
+        local fx, fy, fz, frot = pathlog.formatCoords(target.x, target.y, target.z, rot)
+        local logRot = settings.logRot and frot or ''
+
+        if not comment then
+            comment = ''
+        else
+            comment = table.sconcat(comment)
+        end
+
+        logFile:append(string.format('%s%s%s, %s%s, %s%s,%s%s%s   %s    -- %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp, comment))
+    end
+end
+
+-- Compare last logged point to last received point, if they are very similar, close the leg with a close bracket, otherwise log the last point.
+function pathlog.closeLeg(id)
+    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
+    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
+    local loggedLastDiffX = math.abs(lastLoggedX - lastX)
+    local loggedLastDiffY = math.abs(lastLoggedY - lastY)
+    local loggedLastDiffZ = math.abs(lastLoggedZ - lastZ)
+    local loggedLastDiffRot = math.abs(lastLoggedRot - lastRot)
+
+    if loggedLastDiffX < 1 and loggedLastDiffY < 1 and loggedLastDiffZ < 1 and loggedLastDiffRot < 1 then
+        pathlog.logToFile(logType.closeBracket, id)
+    else
+        pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
+    end
+end
+
+-- Helper functions --
+--------------------------------------------
+
+-- Pad coordinates to align in logs.
+pathlog.padCoords = function(coord, isY, isRot)
+    local padding = 8
+
+    if isY then
+        padding = padding - 1
+    end
+
+    if isRot then
+        padding = padding - 3
+    end
+
+    return string.rep(' ', padding - #coord) .. coord
+end
+
+-- Format coordinates to string with padding.
+function pathlog.formatCoords(x, y, z, rot)
+    local fx = pathlog.padCoords(string.format('%.3f', x))
+    local fy = pathlog.padCoords(string.format('%.3f', y), true)
+    local fz = pathlog.padCoords(string.format('%.3f', z))
+    local frot = pathlog.padCoords(string.format('%i,', rot), false, true)
+
+    return fx, fy, fz, frot
+end
+
+-- Format log output based on settings.
+function pathlog.formatLogOutput()
+    local openBracket = settings.tableEachPoint and '{ ' or ''
+    local closeBracket = settings.tableEachPoint and ' },' or ''
+    local defineX = settings.defineCoordinates and 'x = ' or ''
+    local defineY = settings.defineCoordinates and 'y = ' or ''
+    local defineZ = settings.defineCoordinates and 'z = ' or ''
+    local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
+
+    return openBracket, closeBracket, defineX, defineY, defineZ, defineRot
+end
+
+-- Get file path by id.
+function pathlog.getFilePath(id)
+    local playerName = pathlog.player.name
+    local zone = pathlog.zone
+    local logFiles = pathlog.logFiles
+
+    if not logFiles[id] then
+        if id == pathlog.player.id then
+            logFiles[id] = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
+        else
+            local target = windower.ffxi.get_mob_by_id(id)
+
+            logFiles[id] = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..target.id..'.log')
+        end
+    end
+
+    if not logFiles[id]:exists() then
+        logFiles[id]:create()
+    end
+
+    return logFiles[id]
+end
+
+-- Returns the last logged position in ghost logs by id.
 function getLastLoggedPosByID(id)
     local ghostLog = pathlog.ghostLog
 
     if #ghostLog <= 0 then return end
-    for entry = 1, #ghostLog, 1 do
+    for entry = 1, #ghostLog do
         if ghostLog[entry][1] == tostring(id) then
             return tonumber(ghostLog[entry][2]), tonumber(ghostLog[entry][3]), tonumber(ghostLog[entry][4]), tonumber(ghostLog[entry][5]), tonumber(ghostLog[entry][6])
         end
     end
 end
 
+-- Returns the last received position in ghost logs by id.
 function getLastPosByID(id)
     local ghostLog = pathlog.ghostLog
 
@@ -525,6 +379,7 @@ function getLastPosByID(id)
     end
 end
 
+-- Convert heading to byte rotation. Thank you Zach (Captain)
 function headingToByteRotation(oldHeading)
     local newHeading = oldHeading
 
@@ -535,6 +390,7 @@ function headingToByteRotation(oldHeading)
     return math.round((newHeading / (math.pi * 2)) * 256)
 end
 
+-- Returns true if an entity will scan. Thank you Wiggo (npcl)
 function pathlog.willScan(look, polutils)
     if look == '00003400' or polutils == 'NPC' then
         return false
@@ -542,9 +398,13 @@ function pathlog.willScan(look, polutils)
     return true
 end
 
-local commands = {}
-
 commands.start = function()
+    local target = windower.ffxi.get_mob_by_target('t')
+
+    if target then
+        pathlog.targetIndex = target.index
+    end
+
     settings.logPath = true
     windower.add_to_chat(settings.messageColor, 'Path logging ON')
 end
@@ -562,13 +422,7 @@ commands.stop = function()
             local id = tonumber(trackList[entry])
 
             if #ghostLog > 0 then
-                local isFirst = false
-                local isFinal = true
-                local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
-
-                if lastX and lastY and lastZ then
-                    pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
-                end
+                pathlog.closeLeg(id)
 
                 for entry = #ghostLog, 1, -1 do
                     if id == tonumber(ghostLog[entry][1]) then
@@ -577,20 +431,14 @@ commands.stop = function()
                 end
             end
         end
-    elseif settings.mode == 'target' then
-        if #ghostLog > 0 then
-            local isFirst = false
-            local isFinal = true
+    elseif settings.mode == 'target' and #ghostLog > 0 then
+        for entry = #ghostLog, 1, -1 do
+            local id = tonumber(ghostLog[entry][1])
 
-            for entry = #ghostLog, 1, -1 do
-                local id = ghostLog[entry][1]
-                local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(tonumber(id))
-
-                pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
-                break
-            end
-            ghostLog:clear()
+            pathlog.closeLeg(id)
+            break
         end
+        ghostLog:clear()
     end
 
     settings.logPath = false
@@ -698,12 +546,10 @@ commands.list = function(args)
                 local ghostLog = pathlog.ghostLog
 
                 if #ghostLog > 0 then
-                    local isFirst = false
-                    local isFinal = true
                     local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
 
                     if lastX and lastY and lastZ then
-                        pathlog.logFirstOrFinalPoint(isFirst, isFinal, id, lastX, lastY, lastZ, lastRot, lastTime)
+                        pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
                     end
 
                     for entry = #ghostLog, 1, -1 do
@@ -714,8 +560,7 @@ commands.list = function(args)
                 end
             end
 
-            pathlog.trackList:remove(entry)
-
+            pathlog.trackList:delete(id)
             windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
         else
             windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to remove from tracking list.')
@@ -893,13 +738,3 @@ commands.help = function()
     windower.add_to_chat(settings.messageColor, '//pathlog pauselegs(pl) - In list mode, auto divide mob/npc pauses into separate path legs (default TRUE)')
     windower.add_to_chat(settings.messageColor, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
 end
-
-windower.register_event('addon command', function(command, ...)
-    command = command and command:lower()
-
-    if commands[command] then
-        commands[command](L{...})
-    else
-        commands.help()
-    end
-end)
