@@ -432,9 +432,8 @@ commands.stop = function()
     elseif settings.mode == 'target' and #ghostLog > 0 then
         for entry = #ghostLog, 1, -1 do
             local id = tonumber(ghostLog[entry][1])
-            local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
 
-            pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
+            pathlog.closeLeg(id)
             break
         end
         ghostLog:clear()
