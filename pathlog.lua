@@ -32,6 +32,7 @@ defaults.timeDiff = 4
 settings = config.load(defaults)
 
 local pathlog = {}
+local commands = {}
 pathlog.trackList = T{}
 pathlog.ghostLog = T{}
 
@@ -387,8 +388,6 @@ function pathlog.willScan(look, polutils)
     end
     return true
 end
-
-local commands = {}
 
 commands.start = function()
     local target = windower.ffxi.get_mob_by_target('t')
