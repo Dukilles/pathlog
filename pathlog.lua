@@ -8,7 +8,6 @@ config = require('config')
 packets = require('packets')
 files = require('files')
 require('strings')
-require('lists')
 require('tables')
 
 defaults = {}
@@ -33,7 +32,7 @@ defaults.timeDiff = 4
 settings = config.load(defaults)
 
 local pathlog = {}
-pathlog.trackList = L{}
+pathlog.trackList = T{}
 pathlog.ghostLog = T{}
 
 local logType =
@@ -44,12 +43,17 @@ local logType =
     closeBracket    = 4,
 }
 
+-- Windower Events --
+--------------------------------------------
+
+-- Update variables on load, login, and logout.
 windower.register_event('load', 'login', 'logout', function()
     pathlog.logged_in = windower.ffxi.get_info().logged_in
     pathlog.zone = pathlog.logged_in and resources.zones[windower.ffxi.get_info().zone].name
     pathlog.player = pathlog.logged_in and windower.ffxi.get_player()
 end)
 
+-- Parse incoming packets for mob/npc position data.
 windower.register_event('incoming chunk', function(id, data, modified, injected, blocked)
     if not settings.logPath or not id == 0x0E or not pathlog.logged_in then return end
 
@@ -76,16 +80,13 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
             if target and target.id == npc.id and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
                 pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
             end
-        elseif settings.mode == 'list' and #pathlog.trackList > 0 then
-            local trackList = pathlog.trackList
-
-            if trackList:contains(npc.id) and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
-                pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
-            end
+        elseif settings.mode == 'list' and #pathlog.trackList > 0 and pathlog.trackList:contains(npc.id) and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
+            pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
         end
     end
 end)
 
+-- Parse outgoing packets for player position data.
 windower.register_event('outgoing chunk', function(id, data, modified, injected, blocked)
     if settings.logPath and settings.mode == 'target' and id == 0x015 and pathlog.targetIndex == pathlog.player.index and pathlog.logged_in then
         local packet = packets.parse('outgoing', data)
@@ -103,6 +104,7 @@ windower.register_event('outgoing chunk', function(id, data, modified, injected,
     end
 end)
 
+-- Update target index variable; In target mode, append last received point and close bracket leg, open new leg.
 windower.register_event('target change', function(index)
     if pathlog.logged_in then
         pathlog.targetIndex = index
@@ -123,43 +125,40 @@ windower.register_event('target change', function(index)
     end
 end)
 
+-- Update zone variable; Clear track list and ghost log.
 windower.register_event('zone change', function(new)
     pathlog.zone = resources.zones[new].name
     pathlog.trackList:clear()
     pathlog.ghostLog:clear()
 end)
 
-pathlog.padCoords = function(coord, isY, isRot)
-    local padding = 8
+-- Handle commands.
+windower.register_event('addon command', function(command, ...)
+    command = command and command:lower()
 
-    if isY then
-        padding = padding - 1
-    end
-
-    if isRot then
-        padding = padding - 3
-    end
-
-    return string.rep(' ', padding - #coord) .. coord
-end
-
-function pathlog.getFilePath(id)
-    local player = pathlog.player
-    local playerName = pathlog.player.name
-    local playerID = pathlog.player.id
-    local zone = pathlog.zone
-
-    if id == playerID then
-        return files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
+    if commands[command] then
+        commands[command](L{...})
     else
-        local target = windower.ffxi.get_mob_by_id(id)
-
-        return files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..target.id..'.log')
+        commands.help()
     end
-end
+end)
 
+-- Logging functions --
+--------------------------------------------
+
+-- Log to file by type.
 function pathlog.logToFile(type, id, x, y, z, rot, time)
     local logFile = pathlog.getFilePath(id)
+
+    if not logFile:exists() then
+        logFile:create()
+    end
+
+    if type == logType.closeBracket then
+        logFile:append(string.format('},\n'))
+        return
+    end
+
     local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, time) or ''
     local openBracket = settings.tableEachPoint and '{ ' or ''
     local closeBracket = settings.tableEachPoint and ' },' or ''
@@ -170,60 +169,18 @@ function pathlog.logToFile(type, id, x, y, z, rot, time)
     local fx, fy, fz, frot = pathlog.formatCoords(x, y, z, rot)
     local logRot = settings.logRot and frot or ''
 
-    if not logFile:exists() then
-        logFile:create()
-    end
-
     if type == logType.fromPacket then
         logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp))
     elseif type == logType.firstPoint then
         logFile:append(string.format('{\n    %s%s%s, %s%s, %s%s,%s%s%s    %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp))
     elseif type == logType.lastPoint then
         logFile:append(string.format('    %s%s%s, %s%s, %s%s,%s%s%s    %s\n},\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp))
-    elseif type == logType.closeBracket then
-        logFile:append(string.format('},\n'))
     end
 end
 
-function pathlog.logPointWithComment(comment)
-    local target = windower.ffxi.get_mob_by_target('me')
-
-    if target then
-        local logFile = pathlog.getFilePath(target.id)
-        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
-        local rot = headingToByteRotation(target.heading)
-        local fx, fy, fz, frot = pathlog.formatCoords(target.x, target.y, target.z, rot)
-        local logRot = settings.logRot and frot or ''
-
-        if not comment then
-            comment = ''
-        else
-            comment = table.sconcat(comment)
-        end
-
-        logFile:append(string.format('%s%s%s, %s%s, %s%s,%s%s%s   %s    -- %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp, comment))
-    end
-end
-
-function pathlog.formatCoords(x, y, z, rot)
-    if not (x or y or z or rot) then
-        return 0, 0, 0, 0
-    end
-
-    local fx = pathlog.padCoords(string.format('%.3f', x))
-    local fy = pathlog.padCoords(string.format('%.3f', y), true)
-    local fz = pathlog.padCoords(string.format('%.3f', z))
-    local frot = pathlog.padCoords(string.format('%i,', rot), false, true)
-
-    return fx, fy, fz, frot
-end
-
+-- Checks if incoming point should be logged and returns true or false.
+-- Handles the ghost log, comparing the last logged point, last received point, and the incoming point.
+-- Handles the first point of a leg, last point of a leg, and close bracket of a leg.
 function pathlog.shouldLogPoint(id, x, y, z, rot, time)
     local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
     local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
@@ -315,6 +272,80 @@ function pathlog.shouldLogPoint(id, x, y, z, rot, time)
     end
 end
 
+-- Log to file, append comment to end with command.
+function pathlog.logPointWithComment(comment)
+    local target = windower.ffxi.get_mob_by_target('me')
+
+    if target then
+        local logFile = pathlog.getFilePath(target.id)
+        local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
+        local openBracket = settings.tableEachPoint and '{ ' or ''
+        local closeBracket = settings.tableEachPoint and ' },' or ''
+        local defineX = settings.defineCoordinates and 'x = ' or ''
+        local defineY = settings.defineCoordinates and 'y = ' or ''
+        local defineZ = settings.defineCoordinates and 'z = ' or ''
+        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
+        local rot = headingToByteRotation(target.heading)
+        local fx, fy, fz, frot = pathlog.formatCoords(target.x, target.y, target.z, rot)
+        local logRot = settings.logRot and frot or ''
+
+        if not logFile:exists() then
+            logFile:create()
+        end
+
+        if not comment then
+            comment = ''
+        else
+            comment = table.sconcat(comment)
+        end
+
+        logFile:append(string.format('%s%s%s, %s%s, %s%s,%s%s%s   %s    -- %s\n', openBracket, defineX, fx, defineY, fy, defineZ, fz, defineRot, logRot, closeBracket, timestamp, comment))
+    end
+end
+
+-- Helper functions --
+--------------------------------------------
+
+-- Pad coordinates to align in logs.
+pathlog.padCoords = function(coord, isY, isRot)
+    local padding = 8
+
+    if isY then
+        padding = padding - 1
+    end
+
+    if isRot then
+        padding = padding - 3
+    end
+
+    return string.rep(' ', padding - #coord) .. coord
+end
+
+-- Format coordinates to string with padding.
+function pathlog.formatCoords(x, y, z, rot)
+    local fx = pathlog.padCoords(string.format('%.3f', x))
+    local fy = pathlog.padCoords(string.format('%.3f', y), true)
+    local fz = pathlog.padCoords(string.format('%.3f', z))
+    local frot = pathlog.padCoords(string.format('%i,', rot), false, true)
+
+    return fx, fy, fz, frot
+end
+
+-- Get file path by id.
+function pathlog.getFilePath(id)
+    local playerName = pathlog.player.name
+    local zone = pathlog.zone
+
+    if id == pathlog.player.id then
+        return files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
+    else
+        local target = windower.ffxi.get_mob_by_id(id)
+
+        return files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..target.id..'.log')
+    end
+end
+
+-- Returns the last logged position in ghost logs by id.
 function getLastLoggedPosByID(id)
     local ghostLog = pathlog.ghostLog
 
@@ -326,6 +357,7 @@ function getLastLoggedPosByID(id)
     end
 end
 
+-- Returns the last received position in ghost logs by id.
 function getLastPosByID(id)
     local ghostLog = pathlog.ghostLog
 
@@ -337,6 +369,7 @@ function getLastPosByID(id)
     end
 end
 
+-- Convert heading to byte rotation. Thank you Zach (Captain)
 function headingToByteRotation(oldHeading)
     local newHeading = oldHeading
 
@@ -347,6 +380,7 @@ function headingToByteRotation(oldHeading)
     return math.round((newHeading / (math.pi * 2)) * 256)
 end
 
+-- Returns true if an entity will scan. Thank you Wiggo (npcl)
 function pathlog.willScan(look, polutils)
     if look == '00003400' or polutils == 'NPC' then
         return false
@@ -523,7 +557,7 @@ commands.list = function(args)
                 end
             end
 
-            pathlog.trackList:remove(id)
+            pathlog.trackList:delete(id)
             windower.add_to_chat(settings.messageColor, 'Removed '..id.. ' from tracking list. ')
         else
             windower.add_to_chat(settings.messageColor, 'Must provivde an ID or target an entity to remove from tracking list.')
@@ -701,13 +735,3 @@ commands.help = function()
     windower.add_to_chat(settings.messageColor, '//pathlog pauselegs(pl) - In list mode, auto divide mob/npc pauses into separate path legs (default TRUE)')
     windower.add_to_chat(settings.messageColor, '//pathlog point(p) \'...\' - will add a point and anything typed after to a comment in the logs')
 end
-
-windower.register_event('addon command', function(command, ...)
-    command = command and command:lower()
-
-    if commands[command] then
-        commands[command](L{...})
-    else
-        commands.help()
-    end
-end)
