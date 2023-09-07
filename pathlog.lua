@@ -161,12 +161,7 @@ function pathlog.logToFile(type, id, x, y, z, rot, time)
     end
 
     local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, time) or ''
-    local openBracket = settings.tableEachPoint and '{ ' or ''
-    local closeBracket = settings.tableEachPoint and ' },' or ''
-    local defineX = settings.defineCoordinates and 'x = ' or ''
-    local defineY = settings.defineCoordinates and 'y = ' or ''
-    local defineZ = settings.defineCoordinates and 'z = ' or ''
-    local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
+    local openBracket, closeBracket, defineX, defineY, defineZ, defineRot = pathlog.formatLogOutput()
     local fx, fy, fz, frot = pathlog.formatCoords(x, y, z, rot)
     local logRot = settings.logRot and frot or ''
 
@@ -280,12 +275,7 @@ function pathlog.logPointWithComment(comment)
     if target then
         local logFile = pathlog.getFilePath(target.id)
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
-        local openBracket = settings.tableEachPoint and '{ ' or ''
-        local closeBracket = settings.tableEachPoint and ' },' or ''
-        local defineX = settings.defineCoordinates and 'x = ' or ''
-        local defineY = settings.defineCoordinates and 'y = ' or ''
-        local defineZ = settings.defineCoordinates and 'z = ' or ''
-        local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
+        local openBracket, closeBracket, defineX, defineY, defineZ, defineRot = pathlog.formatLogOutput()
         local rot = headingToByteRotation(target.heading)
         local fx, fy, fz, frot = pathlog.formatCoords(target.x, target.y, target.z, rot)
         local logRot = settings.logRot and frot or ''
@@ -330,6 +320,18 @@ function pathlog.formatCoords(x, y, z, rot)
     local frot = pathlog.padCoords(string.format('%i,', rot), false, true)
 
     return fx, fy, fz, frot
+end
+
+-- Format log output based on settings.
+function pathlog.formatLogOutput()
+    local openBracket = settings.tableEachPoint and '{ ' or ''
+    local closeBracket = settings.tableEachPoint and ' },' or ''
+    local defineX = settings.defineCoordinates and 'x = ' or ''
+    local defineY = settings.defineCoordinates and 'y = ' or ''
+    local defineZ = settings.defineCoordinates and 'z = ' or ''
+    local defineRot = settings.defineCoordinates and settings.logRot and ' rot =' or ''
+
+    return openBracket, closeBracket, defineX, defineY, defineZ, defineRot
 end
 
 -- Get file path by id.
