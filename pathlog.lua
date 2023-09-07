@@ -35,6 +35,7 @@ local pathlog = {}
 local commands = {}
 pathlog.trackList = T{}
 pathlog.ghostLog = T{}
+pathlog.logFiles = T{}
 
 local logType =
 {
@@ -150,10 +151,6 @@ end)
 function pathlog.logToFile(type, id, x, y, z, rot, time)
     local logFile = pathlog.getFilePath(id)
 
-    if not logFile:exists() then
-        logFile:create()
-    end
-
     if type == logType.closeBracket then
         logFile:append(string.format('},\n'))
         return
@@ -257,7 +254,7 @@ function pathlog.shouldLogPoint(id, x, y, z, rot, time)
     end
 end
 
--- Log to file, append comment to end with command.
+-- Handle command to log a single point to player file, append comment to end.
 function pathlog.logPointWithComment(comment)
     local target = windower.ffxi.get_mob_by_target('me')
 
@@ -269,10 +266,6 @@ function pathlog.logPointWithComment(comment)
         local fx, fy, fz, frot = pathlog.formatCoords(target.x, target.y, target.z, rot)
         local logRot = settings.logRot and frot or ''
 
-        if not logFile:exists() then
-            logFile:create()
-        end
-
         if not comment then
             comment = ''
         else
@@ -283,7 +276,7 @@ function pathlog.logPointWithComment(comment)
     end
 end
 
--- Compare last logged point to last received point, if they are the same, close the leg with a close bracket, otherwise log the last point.
+-- Compare last logged point to last received point, if they are very similar, close the leg with a close bracket, otherwise log the last point.
 function pathlog.closeLeg(id)
     local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
     local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
@@ -343,14 +336,23 @@ end
 function pathlog.getFilePath(id)
     local playerName = pathlog.player.name
     local zone = pathlog.zone
+    local logFiles = pathlog.logFiles
 
-    if id == pathlog.player.id then
-        return files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
-    else
-        local target = windower.ffxi.get_mob_by_id(id)
+    if not logFiles[id] then
+        if id == pathlog.player.id then
+            logFiles[id] = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..playerName..'.log')
+        else
+            local target = windower.ffxi.get_mob_by_id(id)
 
-        return files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..target.id..'.log')
+            logFiles[id] = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..target.id..'.log')
+        end
     end
+
+    if not logFiles[id]:exists() then
+        logFiles[id]:create()
+    end
+
+    return logFiles[id]
 end
 
 -- Returns the last logged position in ghost logs by id.
