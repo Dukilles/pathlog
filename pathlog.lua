@@ -283,6 +283,12 @@ end
 function pathlog.closeLeg(id)
     local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
     local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
+
+    if not (lastLoggedX or lastX) then
+        pathlog.logToFile(logType.closeBracket, id)
+        return
+    end
+
     local loggedLastDiffX = math.abs(lastLoggedX - lastX)
     local loggedLastDiffY = math.abs(lastLoggedY - lastY)
     local loggedLastDiffZ = math.abs(lastLoggedZ - lastZ)
