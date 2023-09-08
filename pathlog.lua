@@ -61,7 +61,6 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
 
     local packet = packets.parse('incoming', data)
     local npc = {}
-    local pos = {}
 
     npc.index = packet['Index']
     npc.id = packet['NPC']
@@ -70,23 +69,23 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
 
     if pathlog.willScan(npc.look, npc.polutils) and npc.id then
         walkCount = packet['Walk Count'] -- not currently in use
-        pos.x = packet['X']
-        pos.y = packet['Z'] -- Windower has Z and Y axis swapped
-        pos.z = packet['Y']
-        pos.rot = packet['Rotation']
-        pos.time = os.time()
+        npc.x = packet['X']
+        npc.y = packet['Z'] -- Windower has Z and Y axis swapped
+        npc.z = packet['Y']
+        npc.rot = packet['Rotation']
+        npc.time = os.time()
 
         if settings.mode == 'target' then
             local target = windower.ffxi.get_mob_by_target('t')
 
-            if target and target.id == npc.id and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
-                pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+            if target and target.id == npc.id and pathlog.shouldLogPoint(npc.id, npc.x, npc.y, npc.z, npc.rot, npc.time) then
+                pathlog.logToFile(logType.fromPacket, npc.id, npc.x, npc.y, npc.z, npc.rot, npc.time)
             end
         elseif settings.mode == 'list' and #pathlog.trackList > 0 and pathlog.trackList:contains(npc.id) then
             local target = windower.ffxi.get_mob_by_id(npc.id)
 
-            if target and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
-                pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+            if target and pathlog.shouldLogPoint(npc.id, npc.x, npc.y, npc.z, npc.rot, npc.time) then
+                pathlog.logToFile(logType.fromPacket, npc.id, npc.x, npc.y, npc.z, npc.rot, npc.time)
             end
         end
     end
@@ -96,16 +95,16 @@ end)
 windower.register_event('outgoing chunk', function(id, data, modified, injected, blocked)
     if settings.logPath and settings.mode == 'target' and id == 0x015 and pathlog.targetIndex == pathlog.player.index and pathlog.logged_in then
         local packet = packets.parse('outgoing', data)
-        local pos = {}
+        local char = {}
 
-        pos.x = packet['X']
-        pos.y = packet['Z'] -- Windower has Z and Y axis swapped
-        pos.z = packet['Y']
-        pos.rot = packet['Rotation']
-        pos.time = os.time()
+        char.x = packet['X']
+        char.y = packet['Z'] -- Windower has Z and Y axis swapped
+        char.z = packet['Y']
+        char.rot = packet['Rotation']
+        char.time = os.time()
 
-        if pathlog.shouldLogPoint(pathlog.player.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
-            pathlog.logToFile(logType.fromPacket, pathlog.player.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+        if pathlog.shouldLogPoint(pathlog.player.id, char.x, char.y, char.z, char.rot, char.time) then
+            pathlog.logToFile(logType.fromPacket, pathlog.player.id, char.x, char.y, char.z, char.rot, char.time)
         end
     end
 end)
