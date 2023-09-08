@@ -82,8 +82,12 @@ windower.register_event('incoming chunk', function(id, data, modified, injected,
             if target and target.id == npc.id and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
                 pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
             end
-        elseif settings.mode == 'list' and #pathlog.trackList > 0 and pathlog.trackList:contains(npc.id) and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
-            pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+        elseif settings.mode == 'list' and #pathlog.trackList > 0 and pathlog.trackList:contains(npc.id) then
+            local target = windower.ffxi.get_mob_by_id(npc.id)
+
+            if target and pathlog.shouldLogPoint(npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time) then
+                pathlog.logToFile(logType.fromPacket, npc.id, pos.x, pos.y, pos.z, pos.rot, pos.time)
+            end
         end
     end
 end)
