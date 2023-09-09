@@ -124,8 +124,6 @@ windower.register_event('target change', function(index)
             pathlog.closeLeg(id)
             break
         end
-
-        ghostLog:clear()
     end
 end)
 
@@ -154,6 +152,8 @@ end)
 function pathlog.logToFile(type, id, x, y, z, rot, time)
     local logFile = pathlog.getFilePath(id)
 
+    if not logFile then return end
+
     if type == logType.closeBracket then
         logFile:append(string.format('},\n'))
         return
@@ -177,15 +177,15 @@ end
 -- Handles the ghost log, comparing the last logged point, last received point, and the incoming point.
 -- Handles the first point of a leg, last point of a leg, and close bracket of a leg.
 function pathlog.shouldLogPoint(id, x, y, z, rot, time)
-    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
-    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
+    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = pathlog.getLastLoggedPosByID(id)
+    local lastX, lastY, lastZ, lastRot, lastTime = pathlog.getLastPosByID(id)
     local logFile = pathlog.getFilePath(id)
 
     if x == 0 and y == 0 and z == 0 then
         return false
     end
 
-    if not (lastLoggedX or lastLoggedY or lastLoggedZ or lastLoggedRot) then
+    if not (lastLoggedX and lastLoggedY and lastLoggedZ and lastLoggedRot) then
         pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
         pathlog.ghostLog:append(string.format(id..','..x..','..y..','..z..','..rot..','..time):split(','))
         pathlog.logToFile(logType.firstPoint, id, x, y, z, rot, time)
@@ -265,7 +265,7 @@ function pathlog.logPointWithComment(comment)
         local logFile = pathlog.getFilePath(target.id)
         local timestamp = settings.AddTimestamp and os.date(settings.TimestampFormat, os.time()) or ''
         local openBracket, closeBracket, defineX, defineY, defineZ, defineRot = pathlog.formatLogOutput()
-        local rot = headingToByteRotation(target.heading)
+        local rot = pathlog.headingToByteRotation(target.heading)
         local fx, fy, fz, frot = pathlog.formatCoords(target.x, target.y, target.z, rot)
         local logRot = settings.logRot and frot or ''
 
@@ -279,13 +279,13 @@ function pathlog.logPointWithComment(comment)
     end
 end
 
--- Compare last logged point to last received point, if they are very similar, close the leg with a close bracket, otherwise log the last point.
+-- Compare last logged point to last received point, if they are very similar, close the leg with a close bracket, otherwise log the last point and close leg. Remove entries from ghostLog.
 function pathlog.closeLeg(id)
-    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = getLastLoggedPosByID(id)
-    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
+    local lastLoggedX, lastLoggedY, lastLoggedZ, lastLoggedRot, lastLoggedTime = pathlog.getLastLoggedPosByID(id)
+    local lastX, lastY, lastZ, lastRot, lastTime = pathlog.getLastPosByID(id)
+    local ghostLog = pathlog.ghostLog
 
-    if not (lastLoggedX or lastX) then
-        pathlog.logToFile(logType.closeBracket, id)
+    if #ghostLog <= 0 or not (lastLoggedX and lastLoggedY and lastLoggedZ and lastLoggedRot and lastLoggedTime) or not (lastX and lastY and lastZ and lastRot and lastTime) then
         return
     end
 
@@ -294,10 +294,16 @@ function pathlog.closeLeg(id)
     local loggedLastDiffZ = math.abs(lastLoggedZ - lastZ)
     local loggedLastDiffRot = math.abs(lastLoggedRot - lastRot)
 
-    if loggedLastDiffX < 1 and loggedLastDiffY < 1 and loggedLastDiffZ < 1 and loggedLastDiffRot < 1 then
+    if (loggedLastDiffX and loggedLastDiffY and loggedLastDiffZ and loggedLastDiffRot) < 1 then
         pathlog.logToFile(logType.closeBracket, id)
     else
         pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
+    end
+
+    for entry = #ghostLog, 1, -1 do
+        if id == tonumber(ghostLog[entry][1]) then
+            ghostLog:delete(ghostLog[entry])
+        end
     end
 end
 
@@ -353,11 +359,13 @@ function pathlog.getFilePath(id)
         else
             local target = windower.ffxi.get_mob_by_id(id)
 
-            logFiles[id] = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..target.id..'.log')
+            if target then
+                logFiles[id] = files.new('data/pathlogs/'..playerName..'/'..zone..'/'..target.name..'/'..id..'.log')
+            end
         end
     end
 
-    if not logFiles[id]:exists() then
+    if logFiles[id] and not logFiles[id]:exists() then
         logFiles[id]:create()
     end
 
@@ -365,7 +373,7 @@ function pathlog.getFilePath(id)
 end
 
 -- Returns the last logged position in ghost logs by id.
-function getLastLoggedPosByID(id)
+function pathlog.getLastLoggedPosByID(id)
     local ghostLog = pathlog.ghostLog
 
     if #ghostLog <= 0 then return end
@@ -377,7 +385,7 @@ function getLastLoggedPosByID(id)
 end
 
 -- Returns the last received position in ghost logs by id.
-function getLastPosByID(id)
+function pathlog.getLastPosByID(id)
     local ghostLog = pathlog.ghostLog
 
     if #ghostLog <= 0 then return end
@@ -389,7 +397,7 @@ function getLastPosByID(id)
 end
 
 -- Convert heading to byte rotation. Thank you Zach (Captain)
-function headingToByteRotation(oldHeading)
+function pathlog.headingToByteRotation(oldHeading)
     local newHeading = oldHeading
 
     if newHeading < 0 then
@@ -430,15 +438,7 @@ commands.stop = function()
         for entry = 1, #trackList do
             local id = tonumber(trackList[entry])
 
-            if #ghostLog > 0 then
-                pathlog.closeLeg(id)
-
-                for entry = #ghostLog, 1, -1 do
-                    if id == tonumber(ghostLog[entry][1]) then
-                        ghostLog:delete(ghostLog[entry])
-                    end
-                end
-            end
+            pathlog.closeLeg(id)
         end
     elseif settings.mode == 'target' and #ghostLog > 0 then
         for entry = #ghostLog, 1, -1 do
@@ -447,7 +447,6 @@ commands.stop = function()
             pathlog.closeLeg(id)
             break
         end
-        ghostLog:clear()
     end
 
     settings.logPath = false
@@ -552,21 +551,7 @@ commands.list = function(args)
     elseif option == 'remove' or option == 'r' then
         if id and pathlog.trackList:contains(id) then
             if settings.logPath then -- if removing an id while logging, log the last point and remove entries from ghost log
-                local ghostLog = pathlog.ghostLog
-
-                if #ghostLog > 0 then
-                    local lastX, lastY, lastZ, lastRot, lastTime = getLastPosByID(id)
-
-                    if lastX and lastY and lastZ then
-                        pathlog.logToFile(logType.lastPoint, id, lastX, lastY, lastZ, lastRot, lastTime)
-                    end
-
-                    for entry = #ghostLog, 1, -1 do
-                        if id == tonumber(ghostLog[entry][1]) then
-                            ghostLog:delete(ghostLog[entry])
-                        end
-                    end
-                end
+                pathlog.closeLeg(id)
             end
 
             pathlog.trackList:delete(id)
