@@ -1,12 +1,11 @@
 # Pathlog
 
 - Author: Duke
-- Version 2.1
+- Version 2.1 - Currently Windower Only
 - Pathlog is a tool to log the path of a mob, npc, or player. Its primary purpose is recording the path of a mob or npc for use in a script. The output
 can be customized to the desired format, then copied to the clipboard for pasting into a script. The mode of capture can be set to either use
 the player's cursor target or player can create a list. Be sure to read and understand the settings, then adjust them to fit your project before starting
-path logging. Player *must* be in the same zone and close enough to receive an incoming packet (close enough
-to see a red dot on FFXIDB minimap in my experience).
+path logging. Player *must* be in the same zone and close enough to the target to receive an incoming packet/for Windower to "see" (a red dot on FFXIDB minimap in my experience).
 
 - Please feel free to shoot me a message or send a pull request if you have any suggestions or find any bugs.
 
