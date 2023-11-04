@@ -105,5 +105,5 @@ In list mode, when `pauseLegs` is true, Pathlog will divide the path into legs b
   - Add ghostLog to pull from to append to end and finish a log
   - Add tabling for each leg or the entire path
 
--v2.1 (in testing)
+-v2.1 09 Sept, 2023
   - Heavily refactored to be faster and take up fewer resources
